@@ -1,0 +1,38 @@
+{
+  "name": "crosshair-skeleton",
+  "version": "1.0.0",
+  "description": "A loading skeleton that locks onto any element, maps a grid over it, traces what is inside, then reveals the real content. No dependencies, any framework, light and dark.",
+  "type": "module",
+  "main": "./crosshair-skeleton.js",
+  "module": "./crosshair-skeleton.js",
+  "types": "./crosshair-skeleton.d.ts",
+  "exports": {
+    ".": {
+      "types": "./crosshair-skeleton.d.ts",
+      "default": "./crosshair-skeleton.js"
+    }
+  },
+  "files": [
+    "crosshair-skeleton.js",
+    "crosshair-skeleton.d.ts",
+    "SKILL.md",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "skeleton",
+    "skeleton-loader",
+    "loading",
+    "loading-state",
+    "placeholder",
+    "animation",
+    "crosshair",
+    "wireframe",
+    "react",
+    "vue",
+    "svelte",
+    "agent-skill"
+  ],
+  "license": "MIT"
+}

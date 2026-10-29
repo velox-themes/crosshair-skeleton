@@ -1,0 +1,504 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crosshair Skeleton</title>
+<style>
+  :root {
+    --page: #f6f6f6; --card: #ffffff; --border: #e6e6e6; --text: #0d0d0d; --muted: #6b6d7a;
+    --bar: #d9d9de; --bar-hi: #0d0d0d; --accent: #0d0d0d;
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --page: #0b0b0c; --card: #161618; --border: #26262a; --text: #f2f2f2; --muted: #8b8c96;
+    --bar: #2a2a2f; --bar-hi: #f2f2f2; --accent: #f2f2f2;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--text);
+    font: 14px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  header {
+    position: sticky; top: 0; z-index: 20; display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    padding: 12px 16px; background: var(--page); border-bottom: 1px solid var(--border);
+  }
+  header h1 { font-size: 14px; margin: 0 12px 0 0; }
+  button, select, input {
+    font: inherit; font-size: 12px; font-weight: 500; line-height: 1;
+    padding: 9px 12px; border-radius: 999px; cursor: pointer;
+    border: 1px solid var(--border); background: var(--card); color: var(--text);
+  }
+  button.primary { background: var(--accent); color: var(--card); border-color: var(--accent); }
+  button:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
+  /* Same chevron in every browser, drawn in the text colour */
+  .select { position: relative; display: inline-flex; color: var(--text); }
+  .select select { -webkit-appearance: none; appearance: none; padding-right: 32px; }
+  .select::after {
+    content: ""; position: absolute; right: 13px; top: 50%; width: 10px; height: 10px; margin-top: -5px;
+    background: currentColor; pointer-events: none;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 3.5 5 7l3.5-3.5' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.5 3.5 5 7l3.5-3.5' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / contain no-repeat;
+  }
+  main {
+    display: grid; gap: 40px 24px; padding: 48px 16px 80px; max-width: 1200px; margin: 0 auto;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  }
+  .label { font: 500 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 30px; }
+  .wide { grid-column: 1 / -1; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; }
+
+  /* 1. Stats card (the original prototype content) */
+  .stats { height: 300px; display: flex; flex-direction: column; gap: 12px; }
+  .c-head { display: flex; justify-content: space-between; align-items: center; }
+  .c-title { font-weight: 500; color: var(--muted); }
+  .c-live { font: 500 10px/1 ui-monospace, Menlo, monospace; letter-spacing: .08em; display: flex; align-items: center; gap: 6px; }
+  .c-live::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: #22c55e; }
+  .c-metric { font-size: 40px; font-weight: 600; letter-spacing: -.02em; line-height: 1; }
+  .c-metric span { font-size: .4em; color: var(--muted); font-weight: 500; margin-left: 6px; }
+  .c-bars { flex: 1; min-height: 0; display: flex; align-items: flex-end; gap: 1%; }
+  .c-bars i { flex: 1; background: var(--bar); border-radius: 2px 2px 0 0; }
+  .c-bars i.hi { background: var(--bar-hi); }
+  .c-foot { display: flex; justify-content: space-between; font: 400 10px/1 ui-monospace, Menlo, monospace; color: var(--muted); }
+
+  /* 2. Line chart */
+  .chart { height: 300px; display: grid; grid-template-rows: auto 1fr; gap: 14px; }
+  .chart svg { width: 100%; height: 100%; display: block; }
+
+  /* 3. Article */
+  .article h2 { font-size: 22px; line-height: 1.2; margin: 0 0 10px; letter-spacing: -.01em; }
+  .article p { margin: 0 0 14px; color: var(--muted); }
+  .meta { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+
+  /* 4. Image card */
+  .media { padding: 0; overflow: hidden; }
+  .media img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; }
+  .media figcaption { padding: 14px 18px 18px; }
+  .media b { display: block; }
+  .media small { color: var(--muted); }
+
+  /* 5. List */
+  .list { padding: 6px 18px; }
+  .row { display: flex; align-items: center; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .row:last-child { border-bottom: 0; }
+  .avatar { width: 34px; height: 34px; border-radius: 50%; background: var(--bar); flex-shrink: 0; }
+  .who { flex: 1; min-width: 0; }
+  .who b { display: block; font-weight: 500; }
+  .who span { font-size: 12px; color: var(--muted); }
+  .row button { padding: 7px 12px; }
+
+  /* 6. Headline */
+  .headline { font-size: clamp(32px, 6vw, 64px); line-height: 1.05; letter-spacing: -.03em; font-weight: 600; margin: 0; max-width: 14ch; }
+
+  /* 7. Catalogue grid: three resource cards, each its own skeleton */
+  .shelf { display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); }
+  .item { padding: 8px; border-radius: 10px; }
+  .thumb { position: relative; border-radius: 6px; overflow: hidden; border: 1px solid var(--border); }
+  .thumb img { display: block; width: 100%; height: auto; aspect-ratio: 16 / 10; object-fit: cover; }
+  .badge {
+    position: absolute; top: 8px; left: 8px; height: 24px; padding: 0 8px; border-radius: 4px;
+    display: inline-flex; align-items: center; font-size: 12px; background: #0d0d0d; color: #fff;
+  }
+  .copy {
+    position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; padding: 0; border-radius: 4px;
+    display: grid; place-items: center; background: #fff; color: #0d0d0d; border: 1px solid #d9d9de;
+  }
+  .item-foot { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 12px 4px 4px; }
+  .item-foot b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item-foot span { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+
+  /* 8. KPI tiles */
+  .kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+  .kpi { border: 1px solid var(--border); border-radius: 10px; padding: 14px; background: var(--card); }
+  .kpi small { display: block; color: var(--muted); font-size: 12px; }
+  .kpi strong { display: block; font-size: 26px; letter-spacing: -.02em; margin: 6px 0 2px; }
+  .kpi em { font-style: normal; font-size: 12px; color: #16a34a; }
+  .kpi em.down { color: #dc2626; }
+
+  /* 9. Pricing */
+  .pricing h3 { margin: 0; font-size: 15px; }
+  .pricing .price { font-size: 40px; font-weight: 600; letter-spacing: -.03em; margin: 12px 0 4px; }
+  .pricing .price small { font-size: 14px; color: var(--muted); font-weight: 400; letter-spacing: 0; }
+  .pricing ul { list-style: none; padding: 0; margin: 18px 0 20px; display: grid; gap: 10px; }
+  .pricing li { display: flex; gap: 10px; align-items: center; }
+  .pricing li svg { flex-shrink: 0; }
+  .pricing .cta { width: 100%; padding: 12px; font-size: 13px; }
+
+  /* 10. Form */
+  .form { display: grid; gap: 14px; }
+  .form h3 { margin: 0; font-size: 17px; }
+  .field { display: grid; gap: 6px; font-size: 12px; color: var(--muted); }
+  .field input { border-radius: 8px; padding: 11px 12px; font-size: 13px; font-weight: 400; cursor: text; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--muted); }
+  .check input { width: 16px; height: 16px; padding: 0; border-radius: 4px; }
+  .form .cta { padding: 12px; font-size: 13px; }
+
+  /* 11. Table */
+  .tablecard { padding: 8px 4px; overflow-x: auto; }
+  .tablecard table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tablecard th { text-align: left; font-weight: 500; color: var(--muted); font-size: 12px; }
+  .tablecard th, .tablecard td { padding: 10px 14px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  .tablecard tr:last-child td { border-bottom: 0; }
+  .pill { display: inline-block; padding: 3px 8px; border-radius: 999px; font-size: 11px; background: var(--bar); }
+
+  /* 12. Profile */
+  .profile { padding: 0; overflow: hidden; }
+  .profile .cover { height: 90px; background: linear-gradient(120deg, #a78bfa, #f472b6 60%, #fb923c); }
+  .profile .body { padding: 0 20px 20px; }
+  .profile img { width: 64px; height: 64px; border-radius: 50%; border: 3px solid var(--card); margin-top: -32px; display: block; }
+  .profile h3 { margin: 10px 0 2px; font-size: 17px; }
+  .profile p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .profile dl { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; gap: 8px; }
+  .profile dt { font-weight: 600; font-size: 16px; }
+  .profile dd { margin: 0; font-size: 12px; color: var(--muted); }
+
+  /* 13. Chat */
+  .chat { display: grid; gap: 10px; align-content: start; }
+  .bubble { max-width: 78%; padding: 9px 13px; border-radius: 14px; font-size: 13px; background: var(--bar); }
+  .bubble.me { justify-self: end; background: var(--accent); color: var(--card); }
+  .composer { display: flex; gap: 8px; margin-top: 6px; }
+  .composer input { flex: 1; border-radius: 999px; font-weight: 400; cursor: text; }
+
+  /* 14. Video */
+  .videocard { padding: 0; overflow: hidden; }
+  .videocard .frame { position: relative; }
+  .videocard video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; background: #111; }
+  .videocard .play {
+    position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px;
+    border-radius: 50%; background: rgba(255, 255, 255, .92); color: #0d0d0d; display: grid; place-items: center; padding: 0;
+  }
+  .videocard .info { padding: 14px 18px 18px; }
+  .videocard .info b { display: block; }
+  .videocard .info small { color: var(--muted); }
+
+  /* 15. Donut */
+  .donut { display: grid; grid-template-columns: 140px 1fr; gap: 20px; align-items: center; }
+  .donut svg { width: 140px; height: 140px; display: block; }
+  .legend { display: grid; gap: 10px; font-size: 13px; }
+  .legend span { display: flex; align-items: center; gap: 8px; }
+  .legend i { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+  /* 16. Code */
+  .code { background: #0f1115; color: #d6d9e0; border-color: #23262d; }
+  .code pre { margin: 0; font: 12.5px/1.65 ui-monospace, SFMono-Regular, Menlo, monospace; overflow-x: auto; }
+  .code .k { color: #c792ea; } .code .s { color: #a5d6a7; } .code .c { color: #6b7280; }
+
+  /* 17. Heatmap */
+  .heat h3 { margin: 0 0 12px; font-size: 14px; font-weight: 500; color: var(--muted); }
+  .heat .cells { display: grid; grid-template-columns: repeat(26, 1fr); gap: 3px; }
+  .heat .cells i { aspect-ratio: 1; border-radius: 2px; background: var(--bar); }
+
+  /* 18. Product */
+  .product { padding: 0; overflow: hidden; }
+  .product img { display: block; width: 100%; height: auto; aspect-ratio: 1; object-fit: cover; }
+  .product .info { padding: 14px 16px 16px; display: grid; gap: 6px; }
+  .product .stars { display: flex; gap: 2px; color: #f59e0b; }
+  .product .row2 { display: flex; justify-content: space-between; align-items: center; margin-top: 6px; }
+  .product .row2 strong { font-size: 18px; }
+
+  /* 19. Empty box: content only exists after loading */
+  .empty { min-height: 180px; display: grid; place-items: center; text-align: center; color: var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <h1>Crosshair Skeleton</h1>
+  <button class="primary" id="slow">Load (2.2 s)</button>
+  <button id="fast">Load (80 ms)</button>
+  <button id="hold">Hold</button>
+  <button id="now">Data arrives now</button>
+  <span class="select"><select id="reveal" aria-label="Reveal style">
+    <option value="fade">Reveal: fade</option>
+    <option value="blink">Reveal: blink</option>
+    <option value="scan">Reveal: scan</option>
+  </select></span>
+  <span class="select"><select id="speed" aria-label="Speed">
+    <option value="0.75">Speed 0.75×</option>
+    <option value="1" selected>Speed 1×</option>
+    <option value="1.5">Speed 1.5×</option>
+  </select></span>
+  <button id="theme">Dark</button>
+</header>
+
+<main>
+  <section class="wide">
+    <p class="label">Headline · text</p>
+    <h2 class="headline js-sk">Measuring the space before the data lands</h2>
+  </section>
+
+  <section>
+    <p class="label">Stats card · structure</p>
+    <div class="card stats js-sk">
+      <div class="c-head"><div class="c-title">Network throughput</div><div class="c-live">LIVE</div></div>
+      <div class="c-metric">12.84<span>GB/s</span></div>
+      <div class="c-bars" id="bars"></div>
+      <div class="c-foot"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Line chart · svg</p>
+    <div class="card chart js-sk">
+      <div class="c-head"><div class="c-title">Sessions this week</div><div class="c-live">+8.2%</div></div>
+      <svg viewBox="0 0 300 160" preserveAspectRatio="none" aria-label="Sessions this week chart">
+        <path d="M0 130 L40 118 L80 122 L120 92 L160 98 L200 64 L240 70 L300 30" fill="none" stroke="currentColor" stroke-width="2" vector-effect="non-scaling-stroke"/>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Article · text block</p>
+    <article class="card article js-sk">
+      <h2>Good loading states describe what is coming</h2>
+      <p>The skeleton outlines every line of text, image and control where it will appear, so nothing moves when the real content arrives.</p>
+      <div class="meta"><span>Notes</span><span>4 min read</span></div>
+    </article>
+  </section>
+
+  <section>
+    <p class="label">Image card · media</p>
+    <figure class="card media js-sk" style="margin:0">
+      <img id="photo" alt="Abstract gradient" width="640" height="400">
+      <figcaption><b>Coastal Study No. 4</b><small>Print · A2</small></figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <p class="label">List · rows and buttons</p>
+    <div class="card list js-sk">
+      <div class="row"><div class="avatar"></div><div class="who"><b>Rina Okafor</b><span>Product designer</span></div><button type="button">Follow</button></div>
+      <div class="row"><div class="avatar"></div><div class="who"><b>Tomás Ilić</b><span>Frontend engineer</span></div><button type="button">Follow</button></div>
+      <div class="row"><div class="avatar"></div><div class="who"><b>Lea Marchetti</b><span>Studio founder</span></div><button type="button">Follow</button></div>
+    </div>
+  </section>
+
+  <section class="wide">
+    <p class="label">Catalogue grid · one skeleton per card</p>
+    <div class="shelf" id="shelf"></div>
+  </section>
+
+  <section class="wide">
+    <p class="label">KPI tiles · one skeleton, four sections</p>
+    <div class="kpis js-sk">
+      <div class="kpi"><small>Revenue</small><strong>$48,210</strong><em>+12.4%</em></div>
+      <div class="kpi"><small>Orders</small><strong>1,284</strong><em>+3.1%</em></div>
+      <div class="kpi"><small>Refunds</small><strong>23</strong><em class="down">−0.8%</em></div>
+      <div class="kpi"><small>Avg. order</small><strong>$37.55</strong><em>+1.9%</em></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Pricing · list and button</p>
+    <div class="card pricing js-sk">
+      <h3>Studio</h3>
+      <div class="price">$24<small> / month</small></div>
+      <small style="color:var(--muted)">For freelancers shipping client sites every month.</small>
+      <ul>
+        <li><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg>Unlimited projects</li>
+        <li><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg>Export to HTML and React</li>
+        <li><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 8.5l3 3 7-7"/></svg>Priority support</li>
+      </ul>
+      <button class="primary cta" type="button">Start free trial</button>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Form · inputs and checkbox</p>
+    <form class="card form js-sk" onsubmit="return false">
+      <h3>Create your account</h3>
+      <label class="field">Email<input type="email" placeholder="you@studio.com" autocomplete="off"></label>
+      <label class="field">Password<input type="password" placeholder="At least 8 characters" autocomplete="off"></label>
+      <label class="check"><input type="checkbox">Send me product updates</label>
+      <button class="primary cta" type="button">Sign up</button>
+    </form>
+  </section>
+
+  <section class="wide">
+    <p class="label">Table · rows and cells</p>
+    <div class="card tablecard js-sk">
+      <table>
+        <thead><tr><th>Invoice</th><th>Client</th><th>Date</th><th>Status</th><th style="text-align:right">Amount</th></tr></thead>
+        <tbody>
+          <tr><td>INV-2041</td><td>Northline Studio</td><td>Oct 24</td><td><span class="pill">Paid</span></td><td style="text-align:right">$2,400.00</td></tr>
+          <tr><td>INV-2040</td><td>Harbor &amp; Co.</td><td>Oct 21</td><td><span class="pill">Pending</span></td><td style="text-align:right">$860.00</td></tr>
+          <tr><td>INV-2039</td><td>Fieldwork</td><td>Oct 18</td><td><span class="pill">Paid</span></td><td style="text-align:right">$1,120.00</td></tr>
+          <tr><td>INV-2038</td><td>Oakridge Dental</td><td>Oct 12</td><td><span class="pill">Overdue</span></td><td style="text-align:right">$3,050.00</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Profile · cover, avatar, stats</p>
+    <div class="card profile js-sk">
+      <div class="cover"></div>
+      <div class="body">
+        <img id="face" alt="Portrait of Noor Haddad" width="64" height="64">
+        <h3>Noor Haddad</h3>
+        <p>Brand designer building identity systems for small studios.</p>
+        <dl><div><dt>128</dt><dd>Projects</dd></div><div><dt>4.9</dt><dd>Rating</dd></div><div><dt>12k</dt><dd>Followers</dd></div></dl>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Chat · message bubbles</p>
+    <div class="card chat js-sk">
+      <div class="bubble">Can we move the launch to Thursday?</div>
+      <div class="bubble me">Yes, staging is ready. I'll send the link.</div>
+      <div class="bubble">Perfect, thanks!</div>
+      <div class="composer"><input placeholder="Write a reply…" aria-label="Reply"><button class="primary" type="button">Send</button></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Video · player poster</p>
+    <div class="card videocard js-sk">
+      <div class="frame">
+        <video id="clip" preload="none" playsinline muted width="640" height="360"></video>
+        <button class="play" type="button" aria-label="Play"><svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M5 3.5v11l9-5.5z" fill="currentColor"/></svg></button>
+      </div>
+      <div class="info"><b>Designing a loading state</b><small>12:48 · Workshop</small></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Donut chart · svg + legend</p>
+    <div class="card donut js-sk">
+      <svg viewBox="0 0 42 42" aria-label="Traffic sources">
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="var(--bar)" stroke-width="6"/>
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="#6366f1" stroke-width="6" stroke-dasharray="48 52" stroke-dashoffset="25"/>
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="#f59e0b" stroke-width="6" stroke-dasharray="27 73" stroke-dashoffset="77"/>
+        <circle cx="21" cy="21" r="15.9" fill="none" stroke="#10b981" stroke-width="6" stroke-dasharray="15 85" stroke-dashoffset="50"/>
+      </svg>
+      <div class="legend">
+        <span><i style="background:#6366f1"></i>Search 48%</span>
+        <span><i style="background:#f59e0b"></i>Social 27%</span>
+        <span><i style="background:#10b981"></i>Direct 15%</span>
+        <span><i style="background:var(--bar)"></i>Other 10%</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Code block · monospace lines</p>
+    <div class="card code js-sk">
+<pre><span class="c">// start when loading begins</span>
+<span class="k">const</span> skeleton = crosshair(card);
+<span class="k">const</span> data = <span class="k">await</span> fetch(<span class="s">"/api/stats"</span>);
+render(card, <span class="k">await</span> data.json());
+<span class="k">await</span> skeleton.done();</pre>
+    </div>
+  </section>
+
+  <section class="wide">
+    <p class="label">Heatmap · many small cells</p>
+    <div class="card heat js-sk">
+      <h3>Deploys in the last 26 weeks</h3>
+      <div class="cells" id="cells"></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Product · e-commerce card</p>
+    <div class="card product js-sk">
+      <img id="shoe" alt="Product photo" width="400" height="400">
+      <div class="info">
+        <small style="color:var(--muted)">Desk accessories</small>
+        <b>Walnut Monitor Stand</b>
+        <span class="stars" aria-label="4 out of 5 stars"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1l1.8 3.8 4.2.5-3.1 2.9.8 4.1L7 10.3 3.3 12.3l.8-4.1L1 5.3l4.2-.5z" fill="currentColor"/></svg><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1l1.8 3.8 4.2.5-3.1 2.9.8 4.1L7 10.3 3.3 12.3l.8-4.1L1 5.3l4.2-.5z" fill="currentColor"/></svg><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1l1.8 3.8 4.2.5-3.1 2.9.8 4.1L7 10.3 3.3 12.3l.8-4.1L1 5.3l4.2-.5z" fill="currentColor"/></svg><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1l1.8 3.8 4.2.5-3.1 2.9.8 4.1L7 10.3 3.3 12.3l.8-4.1L1 5.3l4.2-.5z" fill="currentColor"/></svg></span>
+        <div class="row2"><strong>$89</strong><button class="primary" type="button">Add to cart</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <p class="label">Empty box · content arrives later</p>
+    <div class="card empty js-sk" id="empty"></div>
+  </section>
+</main>
+
+<script type="module">
+  import { crosshair } from "./crosshair-skeleton.js";
+
+  const bars = document.getElementById("bars");
+  for (let i = 0; i < 32; i++) {
+    const v = 0.25 + 0.6 * Math.abs(Math.sin(i * 0.55) * Math.cos(i * 0.21)) + (i % 5 === 0 ? 0.12 : 0);
+    const b = document.createElement("i");
+    b.style.height = Math.min(100, v * 100) + "%";
+    if (i === 22) b.className = "hi";
+    bars.appendChild(b);
+  }
+  // Inline image, so the demo makes no network requests
+  document.getElementById("photo").src = "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><defs><radialGradient id="g" cx="30%" cy="35%" r="80%"><stop offset="0" stop-color="#f59e0b"/><stop offset=".5" stop-color="#db2777"/><stop offset="1" stop-color="#1e1b4b"/></radialGradient></defs><rect width="640" height="400" fill="url(#g)"/></svg>`
+  );
+
+  // Catalogue cards: generated thumbnails, so nothing is fetched
+  const thumb = (a, b) => "data:image/svg+xml," + encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300"><defs><linearGradient id="g" x2="1" y2="1"><stop stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="480" height="300" fill="url(#g)"/><rect x="60" y="96" width="220" height="18" rx="9" fill="#fff" opacity=".85"/><rect x="60" y="128" width="150" height="12" rx="6" fill="#fff" opacity=".55"/><rect x="60" y="168" width="96" height="34" rx="17" fill="#fff"/></svg>`
+  );
+  const copyIcon = `<svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="4.5" y="4.5" width="8" height="8" rx="1.5"/><path d="M9.5 2.5V2A1.5 1.5 0 0 0 8 .5H2A1.5 1.5 0 0 0 .5 2v6A1.5 1.5 0 0 0 2 9.5h.5"/></svg>`;
+  document.getElementById("shelf").innerHTML = [
+    ["Pricing with Toggle", "Section", "Free", "#6366f1", "#0ea5e9"],
+    ["Logo Marquee", "Component", "Pro", "#f97316", "#e11d48"],
+    ["Feature Grid", "Section", "Pro", "#10b981", "#0f766e"],
+  ].map(([name, type, tier, a, b]) => `
+    <div class="card item js-sk">
+      <div class="thumb">
+        <img src="${thumb(a, b)}" alt="${name} preview" width="480" height="300">
+        <span class="badge">${tier}</span>
+        <button class="copy" type="button" aria-label="Copy ${name}">${copyIcon}</button>
+      </div>
+      <div class="item-foot"><b>${name}</b><span>${type}</span></div>
+    </div>`).join("");
+
+  // Generated media for the new examples, still no network requests
+  const svgUrl = (s) => "data:image/svg+xml," + encodeURIComponent(s);
+  document.getElementById("face").src = svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="#fcd34d"/><circle cx="64" cy="52" r="24" fill="#92400e"/><rect x="24" y="84" width="80" height="60" rx="40" fill="#92400e"/></svg>`);
+  document.getElementById("clip").poster = svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><defs><linearGradient id="v" x2="1" y2="1"><stop stop-color="#0f172a"/><stop offset="1" stop-color="#334155"/></linearGradient></defs><rect width="640" height="360" fill="url(#v)"/><circle cx="470" cy="120" r="70" fill="#38bdf8" opacity=".35"/><rect x="60" y="250" width="260" height="14" rx="7" fill="#fff" opacity=".6"/></svg>`);
+  document.getElementById("shoe").src = svgUrl(`<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#e7e5e4"/><rect x="70" y="190" width="260" height="26" rx="6" fill="#78350f"/><rect x="95" y="216" width="18" height="70" fill="#78350f"/><rect x="287" y="216" width="18" height="70" fill="#78350f"/><rect x="120" y="96" width="160" height="96" rx="6" fill="#1c1917"/></svg>`);
+  const cells = document.getElementById("cells");
+  for (let i = 0; i < 26 * 7; i++) {
+    const c = document.createElement("i");
+    const v = Math.abs(Math.sin(i * 1.7) * Math.cos(i * 0.31));
+    if (v > 0.25) c.style.background = `color-mix(in srgb, #22c55e ${Math.round(25 + v * 75)}%, transparent)`;
+    cells.appendChild(c);
+  }
+
+  const els = [...document.querySelectorAll(".js-sk")];
+  const empty = document.getElementById("empty");
+  let runs = [], timer = 0;
+
+  function start() {
+    clearTimeout(timer);
+    runs.forEach((r) => r.cancel());
+    empty.innerHTML = "";
+    const opts = { reveal: document.getElementById("reveal").value, speed: +document.getElementById("speed").value };
+    runs = els.map((el) => crosshair(el, opts));
+  }
+  function arrive() {
+    clearTimeout(timer);
+    empty.innerHTML = "<p>Content rendered after the data arrived.<br>The skeleton only knew the box.</p>";
+    return Promise.all(runs.map((r) => r.done()));
+  }
+  function load(ms) { start(); if (ms != null) timer = setTimeout(arrive, ms); }
+
+  document.getElementById("slow").onclick = () => load(2200);
+  document.getElementById("fast").onclick = () => load(80);
+  document.getElementById("hold").onclick = () => load(null);
+  document.getElementById("now").onclick = arrive;
+  document.getElementById("theme").onclick = (e) => {
+    const dark = document.documentElement.dataset.theme !== "dark";
+    document.documentElement.dataset.theme = dark ? "dark" : "light";
+    e.target.textContent = dark ? "Light" : "Dark";
+  };
+  if (matchMedia("(prefers-color-scheme: dark)").matches) document.getElementById("theme").click();
+
+  window.demo = { load, arrive, runs: () => runs };
+  if (!new URLSearchParams(location.search).has("bench")) load(2200);
+</script>
+</body>
+</html>
