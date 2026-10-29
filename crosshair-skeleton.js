@@ -189,6 +189,13 @@ function frameOf(el) {
   });
 }
 
+// The element's outer (border-box) layout size, as DevTools shows it: unaffected by transforms
+function outerSize(el) {
+  if (el.offsetWidth || el.offsetHeight) return [el.offsetWidth, el.offsetHeight];
+  const r = el.getBoundingClientRect();
+  return [Math.round(r.width), Math.round(r.height)];
+}
+
 // The element the sections live in: skip single-child wrappers (a card inside a slot, etc.)
 function contentRoot(el) {
   let root = el;
@@ -261,8 +268,9 @@ function measure(el, W, H, o) {
     if (x >= W || y >= H || x + w <= 0 || y + h <= 0) return;
     const kind = part || leafKind(n, w, h);
     if (kind === "text") {
-      // Text with its own surface (a pill, a chat bubble, a tag) keeps its outline too
-      if (level <= o.depth && hasSurface(n)) add({ kind: "box", x, y, w, h, g });
+      // Text with its own surface (a pill, a chip, a chat bubble) keeps its outline at any depth:
+      // it is a visible shape, not structure
+      if (hasSurface(n)) add({ kind: "box", x, y, w, h, g });
       return textLines(n, g);
     }
     if (kind) return add({ kind, x, y, w, h, g });
@@ -344,6 +352,51 @@ function buildSlot() {
   return at - now;
 }
 
+// Readouts sit above their element, on the parent's background, so they take the parent's colour.
+// One watcher per document keeps them in step when the page switches theme (a class or data attribute
+// on <html>/<body>, or the system colour scheme). It exists only while a readout is showing.
+const themeWatchers = new Map(); // document → { readouts: Map(readout → host), stop() }
+function paintReadout(ro, el) {
+  ro.style.color = (el.ownerDocument.defaultView || window).getComputedStyle(el.parentElement || el).color;
+}
+function trackReadout(ro, el) {
+  const doc = el.ownerDocument;
+  let w = themeWatchers.get(doc);
+  if (!w) {
+    const win = doc.defaultView || window;
+    const readouts = new Map();
+    let frame = 0;
+    const refresh = () => {
+      if (frame) return;
+      frame = win.requestAnimationFrame(() => { frame = 0; readouts.forEach((host, r) => paintReadout(r, host)); });
+    };
+    const mo = new win.MutationObserver(refresh);
+    [doc.documentElement, doc.body].forEach((n) => n && mo.observe(n, { attributes: true }));
+    const mq = win.matchMedia?.("(prefers-color-scheme: dark)");
+    mq?.addEventListener?.("change", refresh);
+    w = {
+      readouts,
+      stop() {
+        mo.disconnect();
+        mq?.removeEventListener?.("change", refresh);
+        if (frame) win.cancelAnimationFrame(frame);
+      },
+    };
+    themeWatchers.set(doc, w);
+  }
+  w.readouts.set(ro, el);
+  paintReadout(ro, el);
+}
+function untrackReadout(ro, el) {
+  const w = themeWatchers.get(el.ownerDocument);
+  if (!w) return;
+  w.readouts.delete(ro);
+  if (!w.readouts.size) {
+    w.stop();
+    themeWatchers.delete(el.ownerDocument);
+  }
+}
+
 const pad4 = (n) => String(Math.max(0, Math.round(n))).padStart(4, "0");
 const live = new WeakMap();
 const active = new Set();
@@ -378,7 +431,7 @@ export function crosshair(el, options = {}) {
 
   let state = "wait"; // wait → ready → queued → build → idle → reveal → done
   let visible = false, ov = null, ro = null, shownAt = 0, cleanAt = 0, raf = 0, revealQueued = false;
-  let m = null, W = 0, H = 0, pulses = [], tracked = [];
+  let m = null, W = 0, H = 0, BW = 0, BH = 0, pulses = [], tracked = [];
   let roLabel = "", roW = 0, roH = 0, roText = "";
   const timers = new Set();
   const later = (fn, ms) => { const id = setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); };
@@ -456,9 +509,31 @@ export function crosshair(el, options = {}) {
     }
   }
 
+  // Inline size: host rules like `.card svg { width: 140px }` must not resize the overlay
+  const svgAttrs = (cls, w, h) => ({ class: cls, width: w, height: h, viewBox: `0 0 ${w} ${h}`, style: `width:${w}px!important;height:${h}px!important` });
+  const wiresFor = (shapes, svg) => shapes.map((sh, i) => ({
+    n: node(doc, "path", { d: pathOf(sh), pathLength: "1", "stroke-dasharray": "1 1" }, svg, true),
+    g: sh.g,
+    d: shapes.length > 1 ? i / (shapes.length - 1) : 0,
+  }));
+
+  // The overlay must not change the element's layout. As the last child it can switch off the element's
+  // own :last-child rules (a list's last-row border, Tailwind's space-y), so if inserting it changes the
+  // element's size, move it to the front, and keep whichever placement leaves the layout as it was.
+  function place() {
+    const before = el.getBoundingClientRect();
+    const drift = () => { const r = el.getBoundingClientRect(); return Math.abs(r.width - before.width) + Math.abs(r.height - before.height); };
+    el.appendChild(ov);
+    const last = drift();
+    if (last < 0.5) return;
+    el.prepend(ov);
+    if (drift() > last) el.appendChild(ov);
+  }
+
   function draw() {
-    W = el.clientWidth;
+    W = el.clientWidth; // the overlay covers the padding box
     H = el.clientHeight;
+    [BW, BH] = outerSize(el); // the readout reports the element's outer size, as DevTools does
     m = measure(el, W, H, o);
     if (W < 24 || H < 12) { state = "idle"; return; } // too small to draw; content just waits hidden
     if (win.getComputedStyle(el).position === "static") {
@@ -469,20 +544,16 @@ export function crosshair(el, options = {}) {
     const s = Math.max(0.4, Math.min(1, Math.min(W, H) / 140));
     const shapes = o.trace === "none" ? [] : m.shapes;
     const showRo = o.readout === true || (o.readout === "auto" && W >= 240 && H >= 120);
-    // Inline size: host rules like `.card svg { width: 140px }` must not resize the overlay
-    const svgAttrs = (cls) => ({ class: cls, width: W, height: H, viewBox: `0 0 ${W} ${H}`, style: `width:${W}px!important;height:${H}px!important` });
 
+    // No `hidden` attribute: Tailwind v4's base layer hides [hidden] with a layered !important that
+    // would beat this stylesheet. place() handles sibling-sensitive layouts instead.
     ov = node(doc, "div", { class: "cs-ov", "aria-hidden": "true" });
     const clip = node(doc, "div", { class: "cs-clip" }, ov);
     node(doc, "div", { class: "cs-fill" }, clip);
-    const gridSvg = node(doc, "svg", svgAttrs("cs-grid"), clip, true);
+    const gridSvg = node(doc, "svg", svgAttrs("cs-grid", W, H), clip, true);
     const grid = buildGrid(doc, gridSvg, W, H, o.cell);
-    const wireSvg = node(doc, "svg", svgAttrs("cs-wire"), clip, true);
-    const wires = shapes.map((sh, i) => ({
-      n: node(doc, "path", { d: pathOf(sh), pathLength: "1", "stroke-dasharray": "1 1" }, wireSvg, true),
-      g: sh.g,
-      d: shapes.length > 1 ? i / (shapes.length - 1) : 0,
-    }));
+    const wireSvg = node(doc, "svg", svgAttrs("cs-wire", W, H), clip, true);
+    const wires = wiresFor(shapes, wireSvg);
     const chs = ["tl", "tr", "bl", "br"].map((c) => {
       const ch = node(doc, "div", { class: "cs-ch", "data-c": c, style: `scale:${s}` }, ov);
       node(doc, "i", {}, ch);
@@ -490,18 +561,19 @@ export function crosshair(el, options = {}) {
     });
     if (showRo) {
       // The readout sits above the element, on the parent's background, so it takes the parent's colour
-      ro = node(doc, "div", { class: "cs-ro", style: `color:${win.getComputedStyle(el.parentElement || el).color}` }, ov);
+      ro = node(doc, "div", { class: "cs-ro" }, ov);
+      trackReadout(ro, el);
       node(doc, "b", {}, ro);
       node(doc, "span", {}, ro);
     }
     ov._wires = wires;
-    el.appendChild(ov);
+    place();
     shownAt = performance.now();
 
     if (reduced) {
       ov.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
       chs.forEach((ch) => (ch.style.opacity = 1));
-      if (ro) { ro.style.opacity = 1; setRo("AWAIT", W, H); }
+      if (ro) { ro.style.opacity = 1; setRo("AWAIT", BW, BH); }
       state = "idle";
       return;
     }
@@ -545,12 +617,12 @@ export function crosshair(el, options = {}) {
       later(() => setRo("MEASURE"), tGo);
       later(() => setRo("MAP"), gridStart);
       if (shapes.length) later(() => setRo("TRACE"), wireStart);
-      later(() => setRo("AWAIT", W, H), end);
+      later(() => setRo("AWAIT", BW, BH), end);
       // The counter follows the corners for the length of the expand, then the loop stops
       const count = () => {
         const p = (performance.now() - shownAt - tGo) / t.expand;
         const e = expandCurve(Math.min(1, Math.max(0, p)));
-        setRo(roLabel, W * e, H * e);
+        setRo(roLabel, BW * e, BH * e);
         if (p < 1) raf = requestAnimationFrame(count);
       };
       later(() => (raf = requestAnimationFrame(count)), tGo);
@@ -578,18 +650,15 @@ export function crosshair(el, options = {}) {
     cancelAnimationFrame(raf);
     if (!ov) return finish();
     // A re-render replaced the host's children and took the overlay with it: put it back for the handover
-    if (!ov.isConnected) el.appendChild(ov);
+    if (!ov.isConnected) place();
 
     const D = reduced ? 200 : HAND.handoff * k;
     const uiAt = reduced ? 0 : HAND.uiAt * k;
     const now = performance.now() - shownAt;
     const opt = (duration, delay = 0) => ({ duration, delay, easing: EASE.out, fill: "forwards" });
     const q = (s) => ov.querySelector(s);
-    const gridEl = q(".cs-grid"), wireEl = q(".cs-wire"), fillEl = q(".cs-fill");
-    const wires = ov._wires;
-    const drawLeft = (w) => Math.max(0, (w.end || 0) - now);
-    const allDrawn = Math.max(0, ...wires.map(drawLeft));
-    if (ro) setRo("READY", W, H);
+    const gridEl = q(".cs-grid"), fillEl = q(".cs-fill");
+    let wireEl = q(".cs-wire"), wires = ov._wires;
 
     // The skeleton followed the theme while waiting; freeze its colour now, before any text colour animates
     ov.style.color = win.getComputedStyle(el).color;
@@ -599,6 +668,37 @@ export function crosshair(el, options = {}) {
     freeze(wireEl);
     wireEl.style.opacity = 1;
     pulses = [];
+
+    // Lock onto the real content. It is rendered by now (still hidden), so measure it again: if it is
+    // a different size, the overlay follows it, and the outlines are redrawn exactly where the real UI
+    // will appear while the placeholder's trace fades out underneath.
+    const NW = el.clientWidth, NH = el.clientHeight;
+    if (!NW || !NH) return finish(); // hidden or collapsed just before the handover: nothing to reveal into
+    if (NW !== W || NH !== H) {
+      W = NW;
+      H = NH;
+      for (const svg of [gridEl, wireEl]) for (const [k2, v] of Object.entries(svgAttrs(svg.getAttribute("class"), W, H))) svg.setAttribute(k2, v);
+      gridEl.replaceChildren();
+      buildGrid(doc, gridEl, W, H, o.cell);
+    }
+    [BW, BH] = outerSize(el);
+    if (o.trace !== "none" && !reduced) {
+      m = measure(el, W, H, o);
+      const fresh = node(doc, "svg", svgAttrs("cs-wire", W, H), null, true);
+      wireEl.after(fresh);
+      wireEl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 160 * k, easing: "ease-out", fill: "forwards" });
+      wires = wiresFor(m.shapes, fresh);
+      const retrace = 220 * k, spread = 120 * k;
+      wires.forEach((w) => {
+        const delay = w.d * spread;
+        w.end = now + delay + retrace;
+        w.n.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: retrace, delay, easing: EASE.draw, fill: "backwards" });
+      });
+      wireEl = fresh;
+    }
+    const drawLeft = (w) => Math.max(0, (w.end || 0) - now);
+    const allDrawn = Math.max(0, ...wires.map(drawLeft));
+    if (ro) setRo("READY", BW, BH);
 
     const hostKids = kids(el);
     const style = reduced ? "fade" : o.reveal;
@@ -691,6 +791,7 @@ export function crosshair(el, options = {}) {
       ov.getAnimations({ subtree: true }).forEach((a) => a.cancel());
       ov.remove();
     }
+    if (ro) untrackReadout(ro, el);
     ov = ro = null;
     resolve();
   }

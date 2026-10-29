@@ -35,6 +35,8 @@ Copy this folder into your agent's skills directory:
 | Codex | `~/.codex/skills/crosshair-skeleton/` |
 | Others that read `SKILL.md` | Their skills folder |
 
+Agents applying the skill should follow [AGENT-GUIDE.md](./AGENT-GUIDE.md): the integration procedure, pitfalls seen on production UI, and a browser verification checklist.
+
 ## Usage
 
 ```js

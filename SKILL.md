@@ -1,6 +1,6 @@
 ---
 name: crosshair-skeleton
-description: A loading skeleton for any element (cards, charts, graphs, text, headlines, images, lists, tables, forms) that locks on with crosshair corners, measures the element, maps a grid over it, traces the shape of what is inside (text lines, image boxes, chart areas, buttons), breathes while it waits, then hands over to the real content with a fade, blink or scan reveal. One dependency-free ES module (about 13 KB gzipped, comments included) with tested adapters for React/Next.js/Preact, Vue/Nuxt and Svelte/SvelteKit, plus patterns for Solid, Angular, Lit, Astro, Alpine and htmx, follows light and dark themes automatically, and is built to be cheap on CPU. Use when the user asks for a "loading skeleton", "skeleton loader", "loading state", "placeholder while data loads", "crosshair loader", "blueprint/wireframe loading", "replace the shimmer", "make loading look technical", or wants a nicer loading state for a card, chart, list or page section.
+description: A loading skeleton for any element (cards, charts, graphs, text, headlines, images, lists, tables, forms) that locks on with crosshair corners, measures the element, maps a grid over it, traces the shape of what is inside (text lines, image boxes, chart areas, buttons), breathes while it waits, then hands over to the real content with a fade, blink or scan reveal. One dependency-free ES module (about 13 KB gzipped, comments included) with tested adapters for React/Next.js/Preact, Vue/Nuxt and Svelte/SvelteKit, plus patterns for Solid, Angular, Lit, Astro, Alpine and htmx, follows light and dark themes automatically, and is built to be cheap on CPU. Use when the user asks for a "loading skeleton", "skeleton loader", "loading state", "placeholder while data loads", "crosshair loader", "blueprint/wireframe loading", "replace the shimmer", "make loading look technical", or wants a nicer loading state for a card, chart, list or page section. Not for button or inline spinners, progress bars, background refreshes of content already on screen, streaming text, or anything the server can render directly.
 license: MIT (see LICENSE)
 ---
 
@@ -17,11 +17,46 @@ A loading state that looks like the interface is being measured and mapped while
 
 Loads faster than 150 ms never show a skeleton. Once shown, it stays at least 600 ms and never hands over mid-move, so it never flashes.
 
-## When to use
+**Integrating into a real project? Read [AGENT-GUIDE.md](./AGENT-GUIDE.md) first.** It has the step-by-step procedure, a worked example, the pitfalls seen when this was applied to production UI, and the browser verification checklist (with a console snippet).
 
-- **Use it** for content that arrives asynchronously into a known area: dashboards, stat cards, charts, feeds, lists, product or resource cards, profile cards, article bodies, search results, a hero waiting on CMS data.
-- **Don't use it** for button spinners, inline "saving…" states, full-page route transitions, or anything under ~40 px tall: a spinner or a disabled state is clearer there.
-- **Many at once** is fine (a grid of 20 cards). Every skeleton breathes in sync, off-screen ones are not built until they scroll in, and the wait is compositor-only.
+## When to use it, and when not
+
+Decide this first. A skeleton is the right tool only when all of these are true:
+
+1. **The content arrives asynchronously** after the page is on screen (client fetch, lazy section, slow CMS or API call).
+2. **The wait is noticeable**: often 300 ms or more. Under 150 ms nothing is drawn anyway; for waits that are always that fast, add nothing.
+3. **The layout is known before the data**: you can render the real component with placeholder data at roughly its final size.
+4. **The area is big enough to read**: about 80 × 40 px or more (a card, panel, chart, list, table, article, hero).
+
+**Use it for:**
+
+| Situation | How |
+|---|---|
+| A card, chart, table, list or panel filled by its own request | One skeleton on that block |
+| A detail page (product, template, profile, article) filled by one request | One skeleton over the page content, inside the page padding |
+| A dashboard whose widgets load separately | One skeleton per widget; they cascade in and breathe in sync |
+| A grid of cards from one request | One skeleton on the grid; if each card loads separately, one per card is fine (20+ is fine) |
+| Lazy sections below the fold | One per section; they don't build until scrolled into view |
+| A hero or section waiting on CMS data | One skeleton, `reveal: "scan"` suits images and heroes |
+
+**Don't use it for (use this instead):**
+
+| Situation | Instead |
+|---|---|
+| Buttons while submitting, inline "Saving…", form validation, icons, anything under about 80 × 40 px | A spinner, a disabled state or inline text |
+| Uploads, exports, installs: progress with a known percentage | A progress bar |
+| Refreshing data that is already on screen (background refetch, stale-while-revalidate, polling) | Keep the content visible; a subtle "Updating" hint at most. Never hide content people are reading |
+| Optimistic updates | Show the optimistic result |
+| Streaming output (AI chat, logs) | Stream the text as it arrives |
+| Results whose shape is unknown until they arrive (search results with an unknown count, an infinite feed's next page) | A skeleton on the container with a fixed `min-height` and `trace: "box"`, or a simple indicator for the next page |
+| Each row of a table or each item of a list separately | One skeleton on the whole table or list |
+| The app shell, navigation or a full-page route transition | Route-level loading of the content area only |
+| Content the server can render directly (SSR, static generation) | Render it on the server: no skeleton beats a fast first paint |
+| Error and empty states | A real error or empty state (drive the skeleton by request status, so errors reveal) |
+
+**Design fit.** The look is precise and technical (crosshairs, grid, wireframe). It suits product, data, developer, design-tool and agency interfaces. On a soft or playful brand, check with the user before applying it everywhere; `pulse: false` and `readout: false` tone it down.
+
+**Many at once** is fine (a grid of 20 cards): skeletons that start together cascade in, every one breathes in sync, off-screen ones are not built until they scroll in, and the wait runs on the compositor.
 
 ## How it knows the shape
 
@@ -33,6 +68,10 @@ While loading, the real content usually isn't there yet. The runtime traces **wh
 | Placeholder markup of your own (fixed-size blocks, empty rows) | Those blocks. |
 | Nothing (an empty container with a reserved size) | The outer box, grid and corners only. |
 
+**At the handover it traces again.** When `done()` runs, your real content is already rendered (still hidden), so the skeleton measures it once more, resizes the overlay if the size changed, and redraws the outlines exactly onto the real layout in about a quarter of a second while the placeholder's outlines fade out. The reveal therefore always lands on the real UI. While waiting it can only trace the placeholder, so the closer the placeholder is to the real data, the steadier it looks (see [AGENT-GUIDE.md](./AGENT-GUIDE.md#pitfalls-seen-in-real-integrations)).
+
+The readout reports the element's outer size (border box), rounded the way DevTools shows it. The overlay never changes the element's layout: if being the last child would switch off a `:last-child` rule (a list's last border, Tailwind `space-y`), it moves itself to the front.
+
 Rules the tracer follows:
 
 - Elements with their own text become **text lines** (one bar per rendered line, at the real width).
@@ -40,7 +79,9 @@ Rules the tracer follows:
 - `svg` and `canvas` of 80×48 px or more become a **chart** (box with two guides); smaller ones (icons) a box.
 - `button`, `input`, `select`, `textarea`, `[role=button]` become a **box**.
 - Other elements become structural boxes down to `depth` levels (1 outer box, 2 sections, 3 their children), skipping wrappers that only repeat their parent's box.
-- Capped at 90 shapes and 600 visited elements, however large the element.
+- Capped at 90 shapes and 600 visited elements, however large the element. Shapes are traced in document order; past the cap the rest of the element still gets the fill and grid, just no outlines. On a very large element (a whole page of cards), set `depth: 2` or mark dense regions `data-crosshair-part="box"` so the outline budget covers the whole page.
+
+**Making placeholder data.** Give it the same shape as the real data, with text of similar length. For images, use a 1×1 transparent data URI so the image's CSS box (`aspect-ratio`, width/height) keeps its size: `data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7`. Keep keys unique in placeholder lists (`${BLANK}#1`, `#2`…). The placeholder is hidden and `inert` while loading, so its text never shows or gets read out.
 
 Hints, when the automatic reading is not what you want:
 
@@ -90,7 +131,7 @@ await skeleton.done();                     // revealed, overlay removed
 </script>
 ```
 
-To keep server-rendered placeholder content from flashing before the script runs, add one line to the global CSS:
+For server-rendered placeholder content (SSR, including React/Next.js, Nuxt and SvelteKit with the adapters), the HTML can paint before JavaScript runs. To keep it from flashing, render the marker on the same element, `data-crosshair={isLoading ? "loading" : "done"}` (or the attribute API), and add one line to the global CSS. Pages rendered only in the browser don't need it: the adapters and `crosshair()` start before the first paint.
 
 ```css
 [data-crosshair="loading"] > :not(.cs-ov) { opacity: 0; }
@@ -113,10 +154,12 @@ Pick the line for the project's stack. Every one of these is tested against the 
 import { useCrosshair } from "crosshair-skeleton/react";
 
 export function RevenueCard({ data }) {
-  const ref = useCrosshair(!data, { reveal: "fade" });
+  const ref = useCrosshair(!data, { reveal: "fade" }); // better: useCrosshair(status === "loading"), see below
   return <div ref={ref} className="card">{data ? <Revenue data={data} /> : <Revenue placeholder />}</div>;
 }
 ```
+
+Pass a loading flag rather than `!data` when the request can fail: with `useCrosshair(status === "loading")` an error reveals your error state instead of breathing forever. Options are read when a run starts, so an inline options object is fine. For a host element other than a div, pass its type: `useCrosshair<HTMLElement>(…)`.
 
 Server rendering is safe: the hook does nothing on the server. It returns a callback ref and follows the element itself, so Strict Mode, a target that mounts later and a replaced (re-keyed) element are all handled.
 
@@ -270,14 +313,16 @@ What the runtime already does (keep it that way when integrating):
 What the integration must do:
 
 - Reserve the final size so neither the skeleton nor the reveal shifts layout.
-- Start one skeleton per independently loading block, not one around the whole page.
-- Don't put the skeleton element inside `overflow: hidden` if the corners and readout should show (they sit just outside the element's edges); the skeleton itself still works there.
+- One skeleton per request: a single fetch that fills a whole page gets one skeleton over that page's content (not around the app shell or the navigation); blocks that load separately get one each.
+- Leave a little room around the element. The crosshair corners reach up to 28 px past each corner and the size readout sits 22 px above the top edge. They never widen the page (the overlay uses layout containment, so anything past the viewport is clipped, never scrolled to), but an element flush with the top of the page or inside `overflow: hidden` loses them. Put the ref on an inner element inside the page's padding rather than on the padded container itself.
 
 ## Accessibility
 
 While loading the element gets `aria-busy="true"` (its own earlier value is restored afterwards) and the overlay is `aria-hidden`. The placeholder content stays in the DOM, hidden and `inert` (its earlier `inert` state is restored), so it can't be focused, clicked or read out while it is a placeholder. Reduced motion is respected automatically.
 
 ## Checklist before calling it done
+
+The full checklist, with how to slow the request and a console snippet, is in [AGENT-GUIDE.md](./AGENT-GUIDE.md#verification-checklist).
 
 - [ ] The element has its final size before `crosshair()` runs (check: the readout shows a realistic size).
 - [ ] `done()` runs after the real content is rendered; `cancel()` runs on unmount.
