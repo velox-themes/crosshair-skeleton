@@ -486,7 +486,8 @@ export function crosshair(el, options = {}) {
 
     const hostKids = kids(el);
     const style = reduced ? "fade" : o.reveal;
-    // Text sitting directly in the element can't take opacity, so it comes in through its fill colour
+    // Text sitting directly in the element can't take opacity, so it comes in through its colour
+    // (the overlay sets its own colour, so it is unaffected; Chrome won't animate -webkit-text-fill-color)
     const ink = ownText(el) ? getComputedStyle(el).color : "";
     el.removeAttribute("data-cs-hide");
     el.removeAttribute("aria-busy");
@@ -495,7 +496,7 @@ export function crosshair(el, options = {}) {
       tracked.push(n.animate(frames, { fill: "both", ...timing }));
       end = Math.max(end, (timing.delay || 0) + timing.duration);
     };
-    const fadeText = (duration, delay) => ink && content(el, [{ webkitTextFillColor: "transparent" }, { webkitTextFillColor: ink }], { duration, delay, easing: EASE.out });
+    const fadeText = (duration, delay) => ink && content(el, [{ color: "transparent" }, { color: ink }], { duration, delay, easing: EASE.out });
 
     ov.querySelectorAll(".cs-ch").forEach((ch) => ch.animate([{ opacity: 1 }, { opacity: 0 }], opt(D * 0.6)));
     if (ro) ro.animate([{ opacity: 1 }, { opacity: 0 }], opt(D * 0.5));
@@ -534,7 +535,7 @@ export function crosshair(el, options = {}) {
         const groups = m.groups.length ? m.groups : hostKids;
         const inGroups = new Set(groups);
         const step = groups.length > 1 ? (HAND.spread * k) / (groups.length - 1) : 0;
-        if (ink) content(el, flicker("transparent", ink, "webkitTextFillColor"), { duration: B, delay: uiAt });
+        if (ink) content(el, flicker("transparent", ink, "color"), { duration: B, delay: uiAt });
         hostKids.filter((c) => !inGroups.has(c)).forEach((c) => content(c, flicker(0, 1), { duration: B, delay: uiAt }));
         groups.forEach((g, i) => content(g, flicker(0, 1), { duration: B, delay: uiAt + i * step }));
         const lastIn = (groups.length - 1) * step + B;

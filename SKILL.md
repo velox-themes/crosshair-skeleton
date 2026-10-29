@@ -215,5 +215,9 @@ While loading the element gets `aria-busy="true"` and the overlay is `aria-hidde
 
 Serve this folder over http (for example `npx serve .`) and open:
 
-- [`demo.html`](./demo.html): a headline, a stats card, an SVG line chart, an article, an image card, a list, a catalogue grid of resource cards, and an empty box, with slow, fast and held loads, all three reveals, speed and theme.
+- [`demo.html`](./demo.html): 21 examples (headline, stats card, line chart, article, image card, list, catalogue grid, KPI tiles, pricing, form, table, profile, chat, video, donut chart, code block, heatmap, product card, empty box) with slow, fast and held loads, all three reveals, speed and theme.
 - [`bench.html`](./bench.html): frame timing and render work at 375, 768 and 1440 px for the load and the wait, plus a leftover check.
+
+---
+
+Made by [Velox Themes](https://library.veloxthemes.com/?utm_source=github&utm_medium=skill&utm_campaign=crosshair-skeleton) · MIT licensed · [Source](https://github.com/velox-themes/crosshair-skeleton)

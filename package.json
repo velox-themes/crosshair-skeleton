@@ -34,5 +34,14 @@
     "svelte",
     "agent-skill"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "author": "Velox Themes (https://library.veloxthemes.com)",
+  "homepage": "https://github.com/velox-themes/crosshair-skeleton#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/velox-themes/crosshair-skeleton.git"
+  },
+  "bugs": {
+    "url": "https://github.com/velox-themes/crosshair-skeleton/issues"
+  }
 }
