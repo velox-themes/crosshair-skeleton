@@ -416,7 +416,7 @@ render(card, <span class="k">await</span> data.json());
 
   <section>
     <p class="label">Empty box · content arrives later</p>
-    <div class="card empty js-sk" id="empty"></div>
+    <div class="card empty js-sk"><div id="empty"></div></div><!-- render into an inner element, never replace the skeleton element's own children -->
   </section>
 </main>
 

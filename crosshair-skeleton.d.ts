@@ -22,7 +22,7 @@ export interface CrosshairOptions {
 export interface CrosshairRun {
   /** The data is in and rendered: reveal (waits for a clean point if mid-build) and clean up. */
   done(): Promise<void>;
-  /** Stop at once and show the content as it is. */
+  /** Stop at once and show the content as it is. An element that still has data-crosshair="loading" stays hidden: the declared state wins. */
   cancel(): void;
   /** Resolves once the skeleton is gone, by done() or cancel(). */
   readonly finished: Promise<void>;

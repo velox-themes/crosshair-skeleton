@@ -29,6 +29,8 @@ const REVEAL_BLINKS = 3;
 const PULSE = 1000;
 const MAX_SHAPES = 90;
 const MAX_VISITS = 600;
+const MAX_WRAPPERS = 32;
+const MAX_TEXT = 1500; // characters measured per text block: plenty for the 8 lines drawn
 
 const EASE = {
   lock: "cubic-bezier(0.16, 1, 0.3, 1)",
@@ -38,45 +40,57 @@ const EASE = {
 };
 
 const mix = (pct) => `color-mix(in srgb, currentColor ${pct}%, transparent)`;
+// Hiding and overlay geometry are !important so ordinary host rules (`.card > div { position: relative }`,
+// an inline `opacity: 1`) can't break them. Reveal animations run only after the hiding marker is removed.
 const CSS = `
-[data-crosshair="loading"]>:not(.cs-ov),[data-cs-hide]>:not(.cs-ov){opacity:0}
+[data-crosshair="loading"]:not([data-cs-show])>:not(.cs-ov),[data-cs-hide]>:not(.cs-ov){opacity:0!important;visibility:hidden!important}
 [data-cs-hide]{-webkit-text-fill-color:transparent}
-.cs-ov{position:absolute;inset:0;z-index:10;pointer-events:none;-webkit-text-fill-color:currentColor;contain:layout style}
-.cs-ov .cs-clip,.cs-ov .cs-scanbox{position:absolute;inset:0;overflow:hidden;border-radius:inherit}
-.cs-ov .cs-fill{position:absolute;inset:0;background:var(--cs-fill,${mix(7)})}
-.cs-ov svg{position:absolute;left:0;top:0;overflow:visible}
+.cs-ov,.cs-ov *{box-sizing:content-box!important;padding:0!important;border:0!important;margin:0!important;min-width:0!important;min-height:0!important;max-width:none!important;max-height:none!important;float:none!important;transform:none}
+.cs-ov{position:absolute!important;inset:0!important;display:block!important;width:auto!important;height:auto!important;background:transparent!important;z-index:10;pointer-events:none!important;-webkit-text-fill-color:currentColor;visibility:visible!important;contain:layout style}
+.cs-ov .cs-clip,.cs-ov .cs-scanbox{position:absolute!important;inset:0!important;display:block!important;overflow:hidden!important;border-radius:inherit}
+.cs-ov .cs-fill{position:absolute!important;inset:0!important;display:block!important;background:var(--cs-fill,${mix(7)})!important}
+.cs-ov svg{position:absolute!important;left:0!important;top:0!important;display:block!important;overflow:visible!important}
 .cs-ov .cs-grid,.cs-ov .cs-wire{will-change:opacity}
 .cs-ov .cs-grid path{fill:none;stroke:var(--cs-line,${mix(5)});stroke-width:1}
 .cs-ov .cs-grid circle{fill:var(--cs-dot,${mix(16)})}
 .cs-ov .cs-wire path{fill:none;stroke:var(--cs-wire,${mix(24)});stroke-width:1}
-.cs-ov .cs-ch{position:absolute;left:0;top:0;width:56px;height:56px;margin:-28px 0 0 -28px;opacity:0}
+.cs-ov .cs-ch{position:absolute!important;display:block!important;left:0;top:0;width:56px!important;height:56px!important;margin:-28px 0 0 -28px!important;opacity:0}
 .cs-ov .cs-ch[data-c=tr]{left:100%}.cs-ov .cs-ch[data-c=bl]{top:100%}.cs-ov .cs-ch[data-c=br]{left:100%;top:100%}
-.cs-ov .cs-ch>i{position:absolute;inset:0;margin:0;padding:0;border:0;--m:var(--cs-mark,${mix(24)});--a:var(--cs-arm,${mix(12)});background:
+.cs-ov .cs-ch>i{position:absolute!important;inset:0!important;display:block!important;--m:var(--cs-mark,${mix(24)});--a:var(--cs-arm,${mix(12)});background:
 linear-gradient(var(--m),var(--m)) 23px 27px/10px 2px no-repeat,
 linear-gradient(var(--m),var(--m)) 27px 23px/2px 10px no-repeat,
 linear-gradient(90deg,transparent,var(--a)) 0 27.5px/23px 1px no-repeat,
 linear-gradient(270deg,transparent,var(--a)) 33px 27.5px/23px 1px no-repeat,
 linear-gradient(180deg,transparent,var(--a)) 27.5px 0/1px 23px no-repeat,
-linear-gradient(0deg,transparent,var(--a)) 27.5px 33px/1px 23px no-repeat}
-.cs-ov .cs-ro{position:absolute;left:18px;top:-22px;font:500 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;white-space:nowrap;font-variant-numeric:tabular-nums;opacity:0}
-.cs-ov .cs-ro b{font-weight:500;margin-right:10px}.cs-ov .cs-ro span{opacity:.55}
-.cs-ov .cs-scan{position:absolute;left:0;right:0;top:0;height:48px;background:var(--cs-scan,${mix(30)});opacity:0;will-change:transform,opacity;-webkit-mask-repeat:repeat-x;mask-repeat:repeat-x}
+linear-gradient(0deg,transparent,var(--a)) 27.5px 33px/1px 23px no-repeat!important}
+.cs-ov .cs-ro{position:absolute!important;display:block!important;left:18px;top:-22px;font:500 10px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;white-space:nowrap;font-variant-numeric:tabular-nums;opacity:0}
+.cs-ov .cs-ro b{font-weight:500;margin-right:10px!important}.cs-ov .cs-ro span{opacity:.55}
+.cs-ov .cs-scan{position:absolute!important;display:block!important;left:0;right:0;top:0;height:48px!important;background:var(--cs-scan,${mix(30)})!important;opacity:0;will-change:transform,opacity;-webkit-mask-repeat:repeat-x;mask-repeat:repeat-x}
 `;
 
-let styled = false;
-function injectStyles() {
-  if (styled) return;
-  styled = true;
+// Styles go to the element's own document (iframes too) or to its shadow root (Lit, web components),
+// once per root. A constructable sheet per document: no <style> tag, works under most CSPs.
+const sheets = new WeakMap();
+const styledRoots = new WeakSet();
+function injectStyles(el) {
+  const doc = el.ownerDocument;
+  const root = el.getRootNode();
+  const target = root.nodeType === 11 && root.host ? root : doc; // nodeType check works across realms
+  if (styledRoots.has(target)) return;
+  styledRoots.add(target);
   try {
-    // Constructable sheet: no <style> tag, works under most CSPs
-    const sheet = new CSSStyleSheet();
-    sheet.replaceSync(CSS);
-    document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+    let sheet = sheets.get(doc);
+    if (!sheet) {
+      sheet = new doc.defaultView.CSSStyleSheet();
+      sheet.replaceSync(CSS);
+      sheets.set(doc, sheet);
+    }
+    target.adoptedStyleSheets = [...target.adoptedStyleSheets, sheet];
   } catch {
-    const tag = document.createElement("style");
+    const tag = doc.createElement("style");
     tag.setAttribute("data-crosshair-skeleton", "");
     tag.textContent = CSS;
-    document.head.appendChild(tag);
+    (target === doc ? doc.head : target).appendChild(tag);
   }
 }
 
@@ -98,11 +112,11 @@ const expandCurve = bezier(0.85, 0, 0.15, 1);
 
 // Ordered 4×4 Bayer dither for the scan line, denser toward the direction of travel
 let ditherUrl = "";
-function dither(height) {
+function dither(doc, height) {
   if (ditherUrl) return ditherUrl;
   const BAYER = [[0, 8, 2, 10], [12, 4, 14, 6], [3, 11, 1, 9], [15, 7, 13, 5]];
   const px = 2, cols = 4, rows = height / px;
-  const cv = document.createElement("canvas");
+  const cv = doc.createElement("canvas");
   cv.width = cols * px;
   cv.height = rows * px;
   const g = cv.getContext("2d");
@@ -128,12 +142,21 @@ function unobserve(el) {
   ioCallbacks.delete(el);
 }
 
+// ---------- DOM building (no HTML strings, so strict Trusted Types policies are fine) ----------
+const SVG_NS = "http://www.w3.org/2000/svg";
+function node(doc, tag, attrs, parent, svg = false) {
+  const n = svg ? doc.createElementNS(SVG_NS, tag) : doc.createElement(tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
 // ---------- Reading the shape ----------
 const SKIP = new Set(["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT", "BR", "WBR", "LINK", "META"]);
 const MEDIA = new Set(["IMG", "VIDEO", "IFRAME", "PICTURE", "OBJECT", "EMBED"]);
 const CONTROL = new Set(["BUTTON", "INPUT", "SELECT", "TEXTAREA", "PROGRESS", "METER"]);
 const NO_CHILDREN = /^(IMG|VIDEO|AUDIO|CANVAS|SVG|INPUT|TEXTAREA|SELECT|IFRAME|PICTURE|EMBED|OBJECT|BR|HR)$/;
-const kids = (n) => [...n.children].filter((c) => !c.classList.contains("cs-ov") && !SKIP.has(c.tagName));
+const kids = (n) => [...n.children].filter((c) => !c.classList.contains("cs-ov") && !SKIP.has(c.tagName.toUpperCase()));
 const ownText = (n) => [...n.childNodes].some((c) => c.nodeType === 3 && c.data.trim());
 
 function leafKind(n, w, h) {
@@ -152,12 +175,27 @@ function hasSurface(n) {
     !(bg === "transparent" || /^rgba?\(.*,\s*0\)$/.test(bg) || /\/\s*0\)$/.test(bg));
 }
 
+// Converts viewport rects into the element's own padding-box coordinates, undoing any scale
+// transform on the element or its ancestors (rotation is not supported)
+function frameOf(el) {
+  const r0 = el.getBoundingClientRect();
+  const sx = el.offsetWidth ? r0.width / el.offsetWidth : 1;
+  const sy = el.offsetHeight ? r0.height / el.offsetHeight : 1;
+  return (r) => ({
+    x: (r.left - r0.left) / sx - el.clientLeft,
+    y: (r.top - r0.top) / sy - el.clientTop,
+    w: r.width / sx,
+    h: r.height / sy,
+  });
+}
+
 // The element the sections live in: skip single-child wrappers (a card inside a slot, etc.)
 function contentRoot(el) {
   let root = el;
-  for (let k = kids(root); k.length === 1; k = kids(root)) {
+  for (let i = 0, k = kids(root); i < MAX_WRAPPERS && k.length === 1; i++, k = kids(root)) {
     const r = k[0].getBoundingClientRect();
-    if (leafKind(k[0], r.width, r.height)) break;
+    // Stop at a leaf, or at a lone box with nothing inside: it is a section to trace, not a wrapper
+    if (k[0].hasAttribute("data-crosshair-part") || leafKind(k[0], r.width, r.height) || !kids(k[0]).length) break;
     root = k[0];
   }
   return root;
@@ -165,8 +203,8 @@ function contentRoot(el) {
 
 function measure(el, W, H, o) {
   const shapes = [];
-  const r0 = el.getBoundingClientRect();
-  const ox = r0.left + el.clientLeft, oy = r0.top + el.clientTop;
+  const doc = el.ownerDocument;
+  const local = frameOf(el);
   const cs = getComputedStyle(el);
   const pad = (side) => parseFloat(cs["padding" + side]) || 0;
   const add = (s) => { if (shapes.length < MAX_SHAPES && s.w >= 2 && s.h >= 2) shapes.push(s); };
@@ -176,9 +214,19 @@ function measure(el, W, H, o) {
   if (o.trace !== "auto") return { shapes, root, groups };
 
   const textLines = (n, g) => {
-    const range = document.createRange();
-    range.selectNodeContents(n);
-    const rects = [...range.getClientRects()].filter((r) => r.width > 1 && r.height > 1).sort((a, b) => a.top - b.top || a.left - b.left);
+    // Text node by node, bounded by characters, nodes and rectangles: a long article costs the same as a short one
+    const range = doc.createRange();
+    const walker = doc.createTreeWalker(n, 4 /* NodeFilter.SHOW_TEXT */);
+    const rects = [];
+    let chars = 0, nodes = 0, t;
+    while ((t = walker.nextNode()) && chars < MAX_TEXT && nodes++ < 200 && rects.length < 400) {
+      if (!t.data.trim()) continue;
+      range.setStart(t, 0);
+      range.setEnd(t, Math.min(t.data.length, MAX_TEXT - chars));
+      chars += t.data.length;
+      for (const r of range.getClientRects()) if (r.width > 1 && r.height > 1) rects.push(r);
+    }
+    rects.sort((a, b) => a.top - b.top || a.left - b.left);
     const lines = [];
     for (const r of rects) {
       const L = lines[lines.length - 1];
@@ -187,8 +235,9 @@ function measure(el, W, H, o) {
       } else if (lines.length < 8) lines.push({ l: r.left, r: r.right, t: r.top, b: r.bottom });
     }
     const bars = lines.map((L) => {
-      const h = L.b - L.t, bh = Math.max(3, Math.round(h * 0.5));
-      return { x: L.l - ox, y: L.t - oy + (h - bh) / 2, w: L.r - L.l, h: bh };
+      const b = local({ left: L.l, top: L.t, width: L.r - L.l, height: L.b - L.t });
+      const bh = Math.max(3, Math.round(b.h * 0.5));
+      return { x: b.x, y: b.y + (b.h - bh) / 2, w: b.w, h: bh };
     }).filter((b) => b.w >= 2 && b.y < H && b.y + b.h > 0);
     if (bars.length) add({ kind: "text", x: bars[0].x, y: bars[0].y, w: bars[0].w, h: bars[0].h, g, lines: bars });
   };
@@ -201,13 +250,14 @@ function measure(el, W, H, o) {
     if (--budget < 0 || shapes.length >= MAX_SHAPES) return;
     const part = n.getAttribute("data-crosshair-part");
     if (part === "skip") return;
-    if (n.checkVisibility && !n.checkVisibility({ visibilityProperty: true })) return;
+    // display:none and content-visibility only: while loading, everything is visibility:hidden on purpose
+    if (n.checkVisibility && !n.checkVisibility()) return;
     const r = n.getBoundingClientRect();
     if (r.width < 1 || r.height < 1) {
       if (getComputedStyle(n).display === "contents") kids(n).forEach((c) => walk(c, level, g, parent));
       return;
     }
-    const x = r.left - ox, y = r.top - oy, w = r.width, h = r.height;
+    const { x, y, w, h } = local(r);
     if (x >= W || y >= H || x + w <= 0 || y + h <= 0) return;
     const kind = part || leafKind(n, w, h);
     if (kind === "text") {
@@ -249,7 +299,7 @@ function pathOf(s) {
 }
 
 // Grid lines land exactly on both edges; never more than ~48 lines however large the element
-function gridMarkup(W, H, cell) {
+function buildGrid(doc, svg, W, H, cell) {
   cell = Math.max(cell, (W + H) / 48);
   const axis = (len) => {
     const n = Math.max(1, Math.round(len / cell)), out = [];
@@ -257,16 +307,22 @@ function gridMarkup(W, H, cell) {
     return out;
   };
   const xs = axis(W), ys = axis(H);
-  const lines = [], delays = [];
-  xs.forEach((x) => { lines.push(`<path d="M${x} 0V${H}" pathLength="1" stroke-dasharray="1 1"/>`); delays.push(x / W); });
-  ys.forEach((y) => { lines.push(`<path d="M0 ${y}H${W}" pathLength="1" stroke-dasharray="1 1"/>`); delays.push(y / H); });
+  const lines = [];
+  const line = (d, delay) => lines.push({ n: node(doc, "path", { d, pathLength: "1", "stroke-dasharray": "1 1" }, svg, true), delay });
+  xs.forEach((x) => line(`M${x} 0V${H}`, x / W));
+  ys.forEach((y) => line(`M0 ${y}H${W}`, y / H));
   // Dots fade in as 12 diagonal bands: 12 animations, not one per dot
-  const BANDS = 12, bands = Array.from({ length: BANDS }, () => []);
+  const BANDS = 12, bands = [];
   if (xs.length * ys.length <= 900) {
-    xs.forEach((x) => ys.forEach((y) => bands[Math.min(BANDS - 1, Math.floor(((x + y) / (W + H)) * BANDS))].push(`<circle cx="${x}" cy="${y}" r="1.15"/>`)));
+    const groups = Array.from({ length: BANDS }, () => null);
+    xs.forEach((x) => ys.forEach((y) => {
+      const i = Math.min(BANDS - 1, Math.floor(((x + y) / (W + H)) * BANDS));
+      groups[i] ||= node(doc, "g", {}, null, true);
+      node(doc, "circle", { cx: x, cy: y, r: "1.15" }, groups[i], true);
+    }));
+    groups.forEach((g, i) => { if (g) { svg.appendChild(g); bands.push({ n: g, delay: i / (BANDS - 1) }); } });
   }
-  const dots = bands.map((b, i) => (b.length ? `<g data-d="${i / (BANDS - 1)}">${b.join("")}</g>` : "")).join("");
-  return { markup: lines.join("") + dots, delays };
+  return { lines, bands };
 }
 
 // Hard-cut flicker, no tweening between states: from → to → from → … → to
@@ -278,7 +334,7 @@ function flicker(from, to, prop = "opacity", n = REVEAL_BLINKS) {
 }
 
 // Skeletons that start together are spaced out a little, so a page of them cascades in
-// instead of every build drawing its first frames at the same moment
+// instead of every build drawing its first frames at the same moment (at most half a second)
 const SLOT = 60, MAX_QUEUE = 480;
 let nextSlot = 0;
 function buildSlot() {
@@ -292,6 +348,11 @@ const pad4 = (n) => String(Math.max(0, Math.round(n))).padStart(4, "0");
 const live = new WeakMap();
 const active = new Set();
 
+function noop() {
+  const p = Promise.resolve();
+  return { done: () => p, cancel() {}, finished: p, ending: true };
+}
+
 /**
  * Start a crosshair skeleton on an element.
  * @param {HTMLElement} el  The element that is loading. Give it its final size.
@@ -299,35 +360,63 @@ const active = new Set();
  * @returns {{ done(): Promise<void>, cancel(): void, finished: Promise<void> }}
  */
 export function crosshair(el, options = {}) {
-  if (!NS_READY || !el) {
-    const p = Promise.resolve();
-    return { done: () => p, cancel() {}, finished: p };
-  }
+  if (!NS_READY || !el) return noop();
   if (NO_CHILDREN.test(el.tagName.toUpperCase())) {
     // The overlay lives inside the element, so it needs one that can hold children
     console.warn("crosshair-skeleton: wrap <" + el.tagName.toLowerCase() + "> in a container and pass the container.");
-    const p = Promise.resolve();
-    return { done: () => p, cancel() {}, finished: p };
+    return noop();
   }
   live.get(el)?.cancel();
-  injectStyles();
+  injectStyles(el);
 
+  const doc = el.ownerDocument;
+  const win = doc.defaultView || window;
   const o = { ...DEFAULTS, ...options };
   const k = o.speed > 0 ? 1 / o.speed : 1;
   const t = Object.fromEntries(Object.entries(BUILD).map(([n, v]) => [n, v * k]));
-  const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const reduced = win.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-  let state = "wait"; // wait → ready → build → idle → reveal → done
-  let visible = false, ov = null, shownAt = 0, cleanAt = 0, raf = 0, revealQueued = false;
-  let m = null, W = 0, H = 0, pulses = [], tracked = [], restorePos = null;
+  let state = "wait"; // wait → ready → queued → build → idle → reveal → done
+  let visible = false, ov = null, ro = null, shownAt = 0, cleanAt = 0, raf = 0, revealQueued = false;
+  let m = null, W = 0, H = 0, pulses = [], tracked = [];
   let roLabel = "", roW = 0, roH = 0, roText = "";
   const timers = new Set();
   const later = (fn, ms) => { const id = setTimeout(() => { timers.delete(id); fn(); }, ms); timers.add(id); };
   let resolve;
   const finished = new Promise((r) => (resolve = r));
 
+  // Everything we change on the host, so cleanup can put it back exactly as it was
+  const prevBusy = el.getAttribute("aria-busy");
+  const prevHide = el.getAttribute("data-cs-hide");
+  const hadInert = el.hasAttribute("inert");
+  const hadStyle = el.hasAttribute("style");
+  let prevPos = null, attrsRestored = false;
+  const put = (name, value) => (value === null ? el.removeAttribute(name) : el.setAttribute(name, value));
+  // At the reveal (or on cancel): content becomes visible and interactive again. Runs once, so a
+  // value the app sets during the handover is never overwritten by the final cleanup.
+  const restoreAttrs = () => {
+    if (attrsRestored) return;
+    attrsRestored = true;
+    put("data-cs-hide", prevHide);
+    put("aria-busy", prevBusy);
+    if (!hadInert) el.removeAttribute("inert");
+  };
+  // At the end, once the overlay is gone (it is positioned against the host until then)
+  const restoreHost = () => {
+    restoreAttrs();
+    if (prevPos) {
+      if (prevPos.value) el.style.setProperty("position", prevPos.value, prevPos.priority);
+      else el.style.removeProperty("position");
+      if (!hadStyle && !el.getAttribute("style")) el.removeAttribute("style");
+      prevPos = null;
+    }
+  };
+
+  // Hidden, inert (no focus, clicks or screen reader access to the placeholder) and busy until the reveal
+  el.removeAttribute("data-cs-show");
   el.setAttribute("data-cs-hide", "");
   el.setAttribute("aria-busy", "true");
+  el.setAttribute("inert", "");
   later(() => { state = "ready"; maybeBuild(); }, o.grace);
   observe(el, (v) => {
     visible = v;
@@ -344,47 +433,75 @@ export function crosshair(el, options = {}) {
   }
 
   function setRo(label, w = roW, h = roH) {
-    const ro = ov?.querySelector(".cs-ro");
     if (!ro) return;
     roLabel = label; roW = w; roH = h;
-    const text = `<b>${label}</b><span>${pad4(w)} × ${pad4(h)}</span>`;
-    if (text !== roText) ro.innerHTML = roText = text;
+    const text = label + "|" + pad4(w) + " × " + pad4(h);
+    if (text === roText) return;
+    roText = text;
+    ro.firstChild.textContent = label;
+    ro.lastChild.textContent = pad4(w) + " × " + pad4(h);
   }
 
   function build() {
+    if (revealQueued || state !== "queued") return; // the data won the race: never draw
+    if (!visible) { state = "ready"; return; } // scrolled away while queued: wait for it to come back
     state = "build";
+    try {
+      draw();
+    } catch (err) {
+      // Never leave content hidden because of a drawing problem, even if the element still declares loading
+      console.warn("crosshair-skeleton: could not draw, showing the content instead.", err);
+      el.setAttribute("data-cs-show", "");
+      finish();
+    }
+  }
+
+  function draw() {
     W = el.clientWidth;
     H = el.clientHeight;
     m = measure(el, W, H, o);
     if (W < 24 || H < 12) { state = "idle"; return; } // too small to draw; content just waits hidden
-    if (getComputedStyle(el).position === "static") { restorePos = el.style.position; el.style.position = "relative"; }
+    if (win.getComputedStyle(el).position === "static") {
+      prevPos = { value: el.style.getPropertyValue("position"), priority: el.style.getPropertyPriority("position") };
+      el.style.setProperty("position", "relative", "important");
+    }
 
     const s = Math.max(0.4, Math.min(1, Math.min(W, H) / 140));
-    const grid = gridMarkup(W, H, o.cell);
     const shapes = o.trace === "none" ? [] : m.shapes;
     const showRo = o.readout === true || (o.readout === "auto" && W >= 240 && H >= 120);
     // Inline size: host rules like `.card svg { width: 140px }` must not resize the overlay
-    const svg = (cls, inner) =>
-      `<svg class="${cls}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" style="width:${W}px;height:${H}px;max-width:none;max-height:none">${inner}</svg>`;
-    const wire = shapes.map((sh, i) => `<path d="${pathOf(sh)}" pathLength="1" stroke-dasharray="1 1" data-g="${sh.g}" data-d="${shapes.length > 1 ? i / (shapes.length - 1) : 0}"/>`).join("");
+    const svgAttrs = (cls) => ({ class: cls, width: W, height: H, viewBox: `0 0 ${W} ${H}`, style: `width:${W}px!important;height:${H}px!important` });
 
-    ov = document.createElement("div");
-    ov.className = "cs-ov";
-    ov.setAttribute("aria-hidden", "true");
-    ov.style.color = getComputedStyle(el).color;
-    ov.innerHTML =
-      `<div class="cs-clip"><div class="cs-fill"></div>${svg("cs-grid", grid.markup)}${svg("cs-wire", wire)}</div>` +
-      ["tl", "tr", "bl", "br"].map((c) => `<div class="cs-ch" data-c="${c}" style="scale:${s}"><i></i></div>`).join("") +
+    ov = node(doc, "div", { class: "cs-ov", "aria-hidden": "true" });
+    const clip = node(doc, "div", { class: "cs-clip" }, ov);
+    node(doc, "div", { class: "cs-fill" }, clip);
+    const gridSvg = node(doc, "svg", svgAttrs("cs-grid"), clip, true);
+    const grid = buildGrid(doc, gridSvg, W, H, o.cell);
+    const wireSvg = node(doc, "svg", svgAttrs("cs-wire"), clip, true);
+    const wires = shapes.map((sh, i) => ({
+      n: node(doc, "path", { d: pathOf(sh), pathLength: "1", "stroke-dasharray": "1 1" }, wireSvg, true),
+      g: sh.g,
+      d: shapes.length > 1 ? i / (shapes.length - 1) : 0,
+    }));
+    const chs = ["tl", "tr", "bl", "br"].map((c) => {
+      const ch = node(doc, "div", { class: "cs-ch", "data-c": c, style: `scale:${s}` }, ov);
+      node(doc, "i", {}, ch);
+      return ch;
+    });
+    if (showRo) {
       // The readout sits above the element, on the parent's background, so it takes the parent's colour
-      (showRo ? `<div class="cs-ro" style="color:${getComputedStyle(el.parentElement || el).color}"></div>` : "");
+      ro = node(doc, "div", { class: "cs-ro", style: `color:${win.getComputedStyle(el.parentElement || el).color}` }, ov);
+      node(doc, "b", {}, ro);
+      node(doc, "span", {}, ro);
+    }
+    ov._wires = wires;
     el.appendChild(ov);
     shownAt = performance.now();
-    const chs = [...ov.querySelectorAll(".cs-ch")];
 
     if (reduced) {
       ov.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 200 });
       chs.forEach((ch) => (ch.style.opacity = 1));
-      if (showRo) { ov.querySelector(".cs-ro").style.opacity = 1; setRo("AWAIT", W, H); }
+      if (ro) { ro.style.opacity = 1; setRo("AWAIT", W, H); }
       state = "idle";
       return;
     }
@@ -402,32 +519,27 @@ export function crosshair(el, options = {}) {
     chs.forEach((ch) => {
       const c = ch.dataset.c;
       ch.animate([{ opacity: 0, scale: 1.8 * s, filter: "blur(4px)" }, { opacity: 1, scale: s, filter: "blur(0px)" }], { duration: t.lock, easing: EASE.lock, fill: "both" });
-      ch.firstElementChild.animate(
+      ch.firstChild.animate(
         [{ opacity: 1 }, { opacity: 1, offset: 0.5 }, { opacity: 0.08, offset: 0.5 }, { opacity: 0.08, offset: 0.999 }, { opacity: 1, offset: 1 }],
         { duration: t.blink, delay: t.lock, iterations: BLINKS }
       );
       // Measure: corners travel out on the same curve as the clip, so the edges stay glued
       ch.animate([{ translate: `${c[1] === "r" ? -W : 0}px ${c[0] === "b" ? -H : 0}px` }, { translate: "0px 0px" }], back(t.expand, tGo, EASE.expand));
     });
-    ov.querySelector(".cs-clip").animate([{ clipPath: "inset(0 100% 100% 0)" }, { clipPath: "inset(0 0% 0% 0)" }], back(t.expand, tGo, EASE.expand));
+    clip.animate([{ clipPath: "inset(0 100% 100% 0)" }, { clipPath: "inset(0 0% 0% 0)" }], back(t.expand, tGo, EASE.expand));
 
     // Map: grid lines sweep in from the origin, then the intersection dots
-    ov.querySelectorAll(".cs-grid > path").forEach((p, i) => {
-      p.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], back(t.draw, gridStart + grid.delays[i] * t.stagger, EASE.draw));
-    });
-    ov.querySelectorAll(".cs-grid > g").forEach((g) => {
-      g.animate([{ opacity: 0 }, { opacity: 1 }], back(dotFade, dotStart + +g.dataset.d * t.stagger, "ease-out"));
-    });
+    grid.lines.forEach((l) => l.n.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], back(t.draw, gridStart + l.delay * t.stagger, EASE.draw)));
+    grid.bands.forEach((b) => b.n.animate([{ opacity: 0 }, { opacity: 1 }], back(dotFade, dotStart + b.delay * t.stagger, "ease-out")));
 
     // Trace: the shape of what is inside, outer box first, in document order
-    ov.querySelectorAll(".cs-wire > path").forEach((p) => {
-      const at = wireStart + +p.dataset.d * t.wireStagger;
-      p.dataset.end = at + t.wireDraw;
-      p.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], back(t.wireDraw, at, EASE.draw));
+    wires.forEach((w) => {
+      const at = wireStart + w.d * t.wireStagger;
+      w.end = at + t.wireDraw;
+      w.n.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], back(t.wireDraw, at, EASE.draw));
     });
 
-    if (showRo) {
-      const ro = ov.querySelector(".cs-ro");
+    if (ro) {
       ro.animate([{ opacity: 0, translate: "0 3px" }, { opacity: 1, translate: "0 0" }], { duration: 240, delay: t.lock * 0.5, easing: "ease-out", fill: "both" });
       setRo("LOCK", 0, 0);
       later(() => setRo("MEASURE"), tGo);
@@ -449,9 +561,9 @@ export function crosshair(el, options = {}) {
     later(() => {
       state = "idle";
       if (!o.pulse) return;
-      pulses = [ov.querySelector(".cs-grid"), ov.querySelector(".cs-wire")].map((n) => {
+      pulses = [gridSvg, wireSvg].map((n) => {
         const a = n.animate([{ opacity: 1 }, { opacity: 0.4 }], { duration: PULSE, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
-        a.startTime = Math.ceil(document.timeline.currentTime / (2 * PULSE)) * 2 * PULSE;
+        a.startTime = Math.ceil(doc.timeline.currentTime / (2 * PULSE)) * 2 * PULSE;
         if (!visible) a.pause();
         return a;
       });
@@ -464,21 +576,25 @@ export function crosshair(el, options = {}) {
     timers.forEach(clearTimeout);
     timers.clear();
     cancelAnimationFrame(raf);
-    if (!ov) return finish(true);
+    if (!ov) return finish();
+    // A re-render replaced the host's children and took the overlay with it: put it back for the handover
+    if (!ov.isConnected) el.appendChild(ov);
 
     const D = reduced ? 200 : HAND.handoff * k;
     const uiAt = reduced ? 0 : HAND.uiAt * k;
     const now = performance.now() - shownAt;
     const opt = (duration, delay = 0) => ({ duration, delay, easing: EASE.out, fill: "forwards" });
     const q = (s) => ov.querySelector(s);
-    const gridEl = q(".cs-grid"), wireEl = q(".cs-wire"), fillEl = q(".cs-fill"), ro = q(".cs-ro");
-    const paths = [...ov.querySelectorAll(".cs-wire > path")];
-    const drawLeft = (p) => Math.max(0, (+p.dataset.end || 0) - now);
-    const allDrawn = Math.max(0, ...paths.map(drawLeft));
+    const gridEl = q(".cs-grid"), wireEl = q(".cs-wire"), fillEl = q(".cs-fill");
+    const wires = ov._wires;
+    const drawLeft = (w) => Math.max(0, (w.end || 0) - now);
+    const allDrawn = Math.max(0, ...wires.map(drawLeft));
     if (ro) setRo("READY", W, H);
 
+    // The skeleton followed the theme while waiting; freeze its colour now, before any text colour animates
+    ov.style.color = win.getComputedStyle(el).color;
     // Freeze the breathing where it is, so nothing jumps; the trace snaps to full strength
-    const freeze = (n) => { const v = +getComputedStyle(n).opacity; n.getAnimations().forEach((a) => a.cancel()); n.style.opacity = v; return v; };
+    const freeze = (n) => { const v = +win.getComputedStyle(n).opacity; n.getAnimations().forEach((a) => a.cancel()); n.style.opacity = v; return v; };
     const og = freeze(gridEl);
     freeze(wireEl);
     wireEl.style.opacity = 1;
@@ -487,10 +603,11 @@ export function crosshair(el, options = {}) {
     const hostKids = kids(el);
     const style = reduced ? "fade" : o.reveal;
     // Text sitting directly in the element can't take opacity, so it comes in through its colour
-    // (the overlay sets its own colour, so it is unaffected; Chrome won't animate -webkit-text-fill-color)
-    const ink = ownText(el) ? getComputedStyle(el).color : "";
-    el.removeAttribute("data-cs-hide");
-    el.removeAttribute("aria-busy");
+    // (the overlay's colour is frozen above; Chrome won't animate -webkit-text-fill-color)
+    const ink = ownText(el) ? win.getComputedStyle(el).color : "";
+    restoreAttrs();
+    // Each child comes back to its own opacity, not to 1
+    const opacityOf = new Map(hostKids.map((c) => [c, +win.getComputedStyle(c).opacity]));
     let end = 0;
     const content = (n, frames, timing) => {
       tracked.push(n.animate(frames, { fill: "both", ...timing }));
@@ -504,20 +621,18 @@ export function crosshair(el, options = {}) {
     if (style === "scan") {
       // A dithered line wipes down; content and skeleton swap exactly at the line
       const S = HAND.scan * k;
-      const top = el.getBoundingClientRect().top + el.clientTop;
+      const local = frameOf(el);
       hostKids.forEach((c) => {
-        const r = c.getBoundingClientRect();
-        const y = Math.min(H, Math.max(0, r.top - top)), h = Math.max(1, Math.min(H - y, r.height));
+        const r = local(c.getBoundingClientRect());
+        const y = Math.min(H, Math.max(0, r.y)), h = Math.max(1, Math.min(H - y, r.h));
         content(c, [{ clipPath: "inset(0 0 100% 0)" }, { clipPath: "inset(0 0 0% 0)" }], { duration: Math.max(1, (h / H) * S), delay: uiAt + (y / H) * S, easing: "linear" });
       });
       // Bare text can't be clipped apart from the overlay, so it lands once the line has passed it
       fadeText(S * 0.3, uiAt + S * 0.85);
       q(".cs-clip").animate([{ clipPath: "inset(0 0 0 0)" }, { clipPath: "inset(100% 0 0 0)" }], { duration: S, delay: uiAt, easing: "linear", fill: "forwards" });
-      const box = document.createElement("div");
-      box.className = "cs-scanbox";
-      box.innerHTML = `<div class="cs-scan"></div>`;
-      ov.appendChild(box);
-      const scan = box.firstElementChild, sh = 48, url = `url(${dither(sh)})`;
+      const box = node(doc, "div", { class: "cs-scanbox" }, ov);
+      const scan = node(doc, "div", { class: "cs-scan" }, box);
+      const sh = 48, url = `url(${dither(doc, sh)})`;
       scan.style.webkitMaskImage = scan.style.maskImage = url;
       scan.style.webkitMaskSize = scan.style.maskSize = "8px 48px";
       scan.animate(
@@ -532,22 +647,23 @@ export function crosshair(el, options = {}) {
       if (style === "blink") {
         // Shell first, then each section flickers on in order; its trace flickers off once it lands
         const B = REVEAL_BLINKS * HAND.blink * k;
-        const groups = m.groups.length ? m.groups : hostKids;
-        const inGroups = new Set(groups);
-        const step = groups.length > 1 ? (HAND.spread * k) / (groups.length - 1) : 0;
+        const groups = m.groups.filter((g) => g.isConnected);
+        const order = groups.length ? groups : hostKids;
+        const inGroups = new Set(order);
+        const step = order.length > 1 ? (HAND.spread * k) / (order.length - 1) : 0;
+        const target = (c) => opacityOf.get(c) ?? +win.getComputedStyle(c).opacity;
         if (ink) content(el, flicker("transparent", ink, "color"), { duration: B, delay: uiAt });
-        hostKids.filter((c) => !inGroups.has(c)).forEach((c) => content(c, flicker(0, 1), { duration: B, delay: uiAt }));
-        groups.forEach((g, i) => content(g, flicker(0, 1), { duration: B, delay: uiAt + i * step }));
-        const lastIn = (groups.length - 1) * step + B;
-        paths.forEach((p) => {
-          const g = +p.dataset.g;
-          const at = Math.max(uiAt + (g < 0 || g >= groups.length ? lastIn : g * step + B), drawLeft(p));
-          p.animate(flicker(1, 0), { duration: B, delay: at, fill: "both" });
+        hostKids.filter((c) => !inGroups.has(c)).forEach((c) => content(c, flicker(0, target(c)), { duration: B, delay: uiAt }));
+        order.forEach((g, i) => content(g, flicker(0, target(g)), { duration: B, delay: uiAt + i * step }));
+        const lastIn = (order.length - 1) * step + B;
+        wires.forEach((w) => {
+          const at = Math.max(uiAt + (w.g < 0 || w.g >= order.length ? lastIn : w.g * step + B), drawLeft(w));
+          w.n.animate(flicker(1, 0), { duration: B, delay: at, fill: "both" });
           end = Math.max(end, at + B);
         });
       } else {
         const U = reduced ? 200 : HAND.fade * k;
-        hostKids.forEach((c) => content(c, [{ opacity: 0 }, { opacity: 1 }], { duration: U, delay: uiAt, easing: EASE.out }));
+        hostKids.forEach((c) => content(c, [{ opacity: 0 }, { opacity: opacityOf.get(c) }], { duration: U, delay: uiAt, easing: EASE.out }));
         fadeText(U, uiAt);
         const at = Math.max(uiAt + D * 0.3, allDrawn); // a trace box never leaves before it has finished drawing
         wireEl.animate([{ opacity: 1 }, { opacity: 0 }], opt(D * 0.7, at));
@@ -555,27 +671,27 @@ export function crosshair(el, options = {}) {
       }
     }
     // Once everything has landed: drop every animation and the overlay, leave the DOM as it was
-    later(() => finish(false), Math.max(end, D) + 50);
+    later(finish, Math.max(end, D) + 50);
   }
 
-  function finish(quick) {
+  function finish() {
     if (state === "done") return;
     state = "done";
     timers.forEach(clearTimeout);
     timers.clear();
     cancelAnimationFrame(raf);
     unobserve(el);
-    live.delete(el);
-    active.delete(el);
-    el.removeAttribute("data-cs-hide");
-    el.removeAttribute("aria-busy");
-    if (restorePos !== null) el.style.position = restorePos;
+    if (live.get(el) === run) live.delete(el);
+    active.delete(run);
+    restoreHost();
     tracked.forEach((a) => a.cancel());
     tracked = [];
     pulses = [];
-    ov?.remove();
-    ov = null;
-    if (quick && !reduced) kids(el).forEach((c) => c.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 160, easing: "ease-out" }));
+    if (ov) {
+      ov.getAnimations({ subtree: true }).forEach((a) => a.cancel());
+      ov.remove();
+    }
+    ov = ro = null;
     resolve();
   }
 
@@ -585,19 +701,20 @@ export function crosshair(el, options = {}) {
     done() {
       if (state === "done" || revealQueued) return finished;
       revealQueued = true;
-      if (!ov) {
-        finish(true); // never drawn: a quick load, so no skeleton at all
-      } else {
-        const wait = Math.max(0, shownAt + Math.max(o.minVisible, cleanAt) - performance.now());
-        if (wait) later(reveal, wait); else reveal();
-      }
+      // Always on a later tick: frameworks may call done() just before they write the new content
+      if (!ov) later(finish, 0); // never drawn: a quick load, so no skeleton at all
+      else later(reveal, Math.max(0, shownAt + Math.max(o.minVisible, cleanAt) - performance.now()));
       return finished;
     },
-    /** Stop at once and show the content as it is, no animation. */
-    cancel() { finish(false); },
+    /** Stop at once and show the content as it is, no animation. (An element that still has
+     *  data-crosshair="loading" stays hidden: the declared state wins until it changes.) */
+    cancel() { finish(); },
+    /** @internal true once done() or cancel() has been called */
+    get ending() { return revealQueued || state === "done"; },
   };
+  run.el = el;
   live.set(el, run);
-  active.add(el);
+  active.add(run);
   return run;
 }
 
@@ -605,22 +722,28 @@ export function crosshair(el, options = {}) {
  * Declarative use: any element with data-crosshair="loading" gets a skeleton;
  * changing the attribute to anything else (or removing it) reveals the content.
  * Options: data-crosshair-reveal, data-crosshair-trace, data-crosshair-speed.
- * @returns {() => void} stop watching
+ * Pass a shadow root to watch inside a web component.
+ * @returns {() => void} stop watching (and stop the skeletons this watcher started)
  */
 export function watch(root = NS_READY ? document : null) {
   if (!root) return () => {};
+  const mine = new Set();
   const handle = (el) => {
     const v = el.getAttribute("data-crosshair");
+    const current = live.get(el);
     if (v === "loading") {
-      if (live.has(el)) return;
+      // Loading again while the previous run is still handing over: start a fresh one
+      if (current && !current.ending) return;
       const d = el.dataset;
-      crosshair(el, {
+      const run = crosshair(el, {
         ...(d.crosshairReveal && { reveal: d.crosshairReveal }),
         ...(d.crosshairTrace && { trace: d.crosshairTrace }),
         ...(d.crosshairSpeed && { speed: +d.crosshairSpeed }),
       });
+      mine.add(run);
+      run.finished.then(() => mine.delete(run)); // owned until it has really finished, handover included
     } else {
-      live.get(el)?.done();
+      current?.done();
     }
   };
   root.querySelectorAll("[data-crosshair]").forEach(handle);
@@ -634,8 +757,12 @@ export function watch(root = NS_READY ? document : null) {
       });
     }
     // An element removed while loading: stop its skeleton
-    active.forEach((el) => { if (!el.isConnected) live.get(el)?.cancel(); });
+    active.forEach((run) => { if (!run.el.isConnected) run.cancel(); });
   });
   mo.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-crosshair"] });
-  return () => mo.disconnect();
+  return () => {
+    mo.disconnect();
+    mine.forEach((run) => run.cancel());
+    mine.clear();
+  };
 }

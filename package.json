@@ -10,16 +10,44 @@
     ".": {
       "types": "./crosshair-skeleton.d.ts",
       "default": "./crosshair-skeleton.js"
+    },
+    "./react": {
+      "types": "./react.d.ts",
+      "default": "./react.js"
+    },
+    "./vue": {
+      "types": "./vue.d.ts",
+      "default": "./vue.js"
+    },
+    "./svelte": {
+      "types": "./svelte.d.ts",
+      "default": "./svelte.js"
     }
   },
   "files": [
     "crosshair-skeleton.js",
     "crosshair-skeleton.d.ts",
+    "react.js",
+    "react.d.ts",
+    "vue.js",
+    "vue.d.ts",
+    "svelte.js",
+    "svelte.d.ts",
     "SKILL.md",
     "README.md",
     "LICENSE"
   ],
   "sideEffects": false,
+  "peerDependencies": {
+    "react": ">=16.8",
+    "svelte": ">=3",
+    "vue": ">=3"
+  },
+  "peerDependenciesMeta": {
+    "react": { "optional": true },
+    "svelte": { "optional": true },
+    "vue": { "optional": true }
+  },
   "keywords": [
     "skeleton",
     "skeleton-loader",

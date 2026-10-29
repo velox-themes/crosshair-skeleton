@@ -51,12 +51,28 @@ Declarative, for any framework or server-rendered HTML:
 ```html
 <section data-crosshair="loading" data-crosshair-reveal="blink">…</section>
 <script type="module">
-  import { watch } from "crosshair-skeleton";
+  import { watch } from "./crosshair-skeleton.js"; // or "crosshair-skeleton" with a bundler
   watch(); // set data-crosshair to anything else to reveal
 </script>
 ```
 
-React, Vue and Svelte examples, every option, part hints and theming are in [SKILL.md](./SKILL.md).
+### Works with your stack
+
+```jsx
+// React, Next.js, Remix, Preact
+import { useCrosshair } from "crosshair-skeleton/react";
+const ref = useCrosshair(!data);           // <div ref={ref}>…</div>
+```
+
+```html
+<!-- Vue, Nuxt: app.use(CrosshairSkeleton) from "crosshair-skeleton/vue" -->
+<div v-crosshair="!data">…</div>
+
+<!-- Svelte, SvelteKit: import { skeleton } from "crosshair-skeleton/svelte" -->
+<div use:skeleton={!data}>…</div>
+```
+
+Each adapter is tested against the real framework: the skeleton appears, the real data is revealed, a reload restarts it and an unmount mid-load leaves nothing behind. Tested: React 19 (Strict Mode), Preact 10, Vue 3.5, Svelte 5, Solid 1.9, Lit 3 (shadow DOM), Alpine 3 and htmx 2. React and Vue also server-render cleanly (Next.js, Nuxt). Solid, Angular, Lit, Astro, Alpine and htmx patterns, every option, part hints and theming are in [SKILL.md](./SKILL.md).
 
 ## Options
 
@@ -74,13 +90,13 @@ It traces whatever is inside the element when loading starts. Render your real c
 
 ## Performance
 
-Measured with `bench.html`, all 21 demo skeletons on screen at once:
+Measured with `bench.html` at 375, 768 and 1440 px, with every demo skeleton in the viewport (5 to 9) building at once:
 
 | | Build (about 1.5 s) | Waiting |
 |---|---|---|
-| Chrome 152 | 60 fps, render work p95 under 3 ms | about 0.3 ms per frame |
-| Firefox 158 | 60 fps, at most 2 long frames, render work p95 under 9 ms | under 0.1 ms per frame |
-| WebKit 26.6 (Safari) | 60 fps, a few long frames | about 1.4 ms per frame |
+| Chrome 153 | 0 long frames, render work p95 under 5.1 ms | about 0.5 ms per frame |
+| Firefox 158 | 0 to 4 long frames, render work p95 under 10 ms | under 0.1 ms per frame |
+| WebKit 26.6 (Safari) | 2 long frames, render work p95 under 5 ms | about 0.6 ms per frame |
 
 Skeletons that start together cascade in 60 ms apart, `prefers-reduced-motion` gets a static skeleton and a short fade, and nothing is left in the DOM after the reveal.
 

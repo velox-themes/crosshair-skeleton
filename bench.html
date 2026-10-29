@@ -23,10 +23,10 @@
 </head>
 <body>
 <h1>Crosshair skeleton: frame benchmark</h1>
-<p>Runs the demo at three sizes, with every example skeleton on screen at once. "Load" covers build, wait and reveal (data after 1.8 s). "Idle" is the long wait after the build. Render work is the time from a frame's callback to the first task after that frame's style, layout and paint.</p>
+<p>Runs the demo at three sizes, with every example that fits in the viewport building at once ("Built" says how many; off-screen ones wait, by design). "Load" covers build, wait and reveal (data after 1.8 s). "Idle" is the long wait after the build. Render work is the time from a frame's callback to the first task after that frame's style, layout and paint.</p>
 <p id="ua"></p>
 <div class="scroll"><table>
-  <thead><tr><th>Viewport</th><th>Phase</th><th>Frames</th><th>Avg</th><th>p95</th><th>Worst</th><th>Janky (&gt;25ms)</th><th>Render work avg / p95</th><th>Left after</th><th>Errors</th></tr></thead>
+  <thead><tr><th>Viewport</th><th>Phase</th><th>Built</th><th>Frames</th><th>Avg</th><th>p95</th><th>Worst</th><th>Janky (&gt;25ms)</th><th>Render work avg / p95</th><th>Left after</th><th>Errors</th></tr></thead>
   <tbody id="rows"></tbody>
 </table></div>
 <div id="wrap"><iframe id="f" title="Demo under test"></iframe></div>
@@ -62,8 +62,8 @@
       workAvg: work.reduce((a, b) => a + b, 0) / work.length, workP95: w[Math.floor(w.length * 0.95)],
     };
   }
-  function row(vp, phase, r, left, errors) {
-    rows.insertAdjacentHTML("beforeend", `<tr><td>${vp}</td><td>${phase}</td><td>${r.frames}</td>
+  function row(vp, phase, built, r, left, errors) {
+    rows.insertAdjacentHTML("beforeend", `<tr><td>${vp}</td><td>${phase}</td><td>${built}</td><td>${r.frames}</td>
       <td class="${cls(r.avg, 17.5, 25)}">${r.avg.toFixed(1)}ms</td><td class="${cls(r.p95, 20, 34)}">${r.p95.toFixed(1)}ms</td>
       <td class="${cls(r.worst, 34, 60)}">${r.worst.toFixed(1)}ms</td><td class="${cls(r.janky, 2, 8)}">${r.janky}</td>
       <td class="${cls(r.workP95, 4, 8)}">${r.workAvg.toFixed(2)} / ${r.workP95.toFixed(2)}ms</td>
@@ -84,16 +84,18 @@
     win.demo.load(null); // warm-up
     await wait(2500);
     win.demo.load(1800);
+    let built = 0;
+    setTimeout(() => (built = doc.querySelectorAll(".cs-ov").length), 1400); // all builds have started by now
     const load = await measure(win, 3800);
     await wait(800);
     const left = doc.querySelectorAll(".cs-ov,[data-cs-hide]").length + doc.getAnimations().length;
-    row(`${w}×${h}`, "Load", load, left, errors);
+    row(`${w}×${h}`, "Load", built, load, left, errors);
 
     win.demo.load(null);
     await wait(2600); // build done, now only the breathing runs
     const idle = await measure(win, 2000);
     const running = doc.getAnimations().filter((a) => a.playState === "running").length;
-    row(`${w}×${h}`, `Idle (${running} anims)`, idle, "", errors);
+    row(`${w}×${h}`, `Idle (${running} anims)`, doc.querySelectorAll(".cs-ov").length, idle, "", errors);
     win.demo.arrive();
   }
   document.title = "Bench done";

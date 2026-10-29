@@ -1,6 +1,6 @@
 ---
 name: crosshair-skeleton
-description: A loading skeleton for any element (cards, charts, graphs, text, headlines, images, lists, tables, forms) that locks on with crosshair corners, measures the element, maps a grid over it, traces the shape of what is inside (text lines, image boxes, chart areas, buttons), breathes while it waits, then hands over to the real content with a fade, blink or scan reveal. One dependency-free ES module (about 10 KB gzipped), works with any framework (vanilla, React, Next.js, Vue, Svelte, Astro, Angular), follows light and dark themes automatically, and is built to be cheap on CPU. Use when the user asks for a "loading skeleton", "skeleton loader", "loading state", "placeholder while data loads", "crosshair loader", "blueprint/wireframe loading", "replace the shimmer", "make loading look technical", or wants a nicer loading state for a card, chart, list or page section.
+description: A loading skeleton for any element (cards, charts, graphs, text, headlines, images, lists, tables, forms) that locks on with crosshair corners, measures the element, maps a grid over it, traces the shape of what is inside (text lines, image boxes, chart areas, buttons), breathes while it waits, then hands over to the real content with a fade, blink or scan reveal. One dependency-free ES module (about 13 KB gzipped, comments included) with tested adapters for React/Next.js/Preact, Vue/Nuxt and Svelte/SvelteKit, plus patterns for Solid, Angular, Lit, Astro, Alpine and htmx, follows light and dark themes automatically, and is built to be cheap on CPU. Use when the user asks for a "loading skeleton", "skeleton loader", "loading state", "placeholder while data loads", "crosshair loader", "blueprint/wireframe loading", "replace the shimmer", "make loading look technical", or wants a nicer loading state for a card, chart, list or page section.
 license: MIT (see LICENSE)
 ---
 
@@ -64,13 +64,14 @@ Rules for every framework:
 1. Start it **when loading starts**, on the element that will hold the content, while that element already has its final size (placeholder data, a fixed height, `min-height` or `aspect-ratio`). A collapsed element has nothing to draw.
 2. Call `done()` **after the real content is rendered**. It waits for a clean point, reveals, removes itself and resolves its promise.
 3. Call `cancel()` when the component unmounts mid-load.
-4. The element must be able to hold children: wrap a bare `<img>`, `<canvas>` or `<video>` in a container and pass the container.
-5. Don't wait for `document.fonts.ready` before starting: the skeleton has no web fonts, and waiting delays the first frame.
+4. Render the real content **into** the element's children, not by replacing the element's own `innerHTML`/`textContent` (the overlay lives inside it). For server fragments (htmx, Turbo, Livewire), put the skeleton on a wrapper and swap an inner element.
+5. The element must be able to hold children: wrap a bare `<img>`, `<canvas>` or `<video>` in a container and pass the container.
+6. Don't wait for `document.fonts.ready` before starting: the skeleton has no web fonts, and waiting delays the first frame.
 
 **Vanilla**
 
 ```js
-import { crosshair } from "./crosshair-skeleton.js";
+import { crosshair } from "crosshair-skeleton"; // with a bundler; plain HTML: "./crosshair-skeleton.js"
 
 const card = document.querySelector("#revenue");
 const skeleton = crosshair(card);          // loading starts
@@ -84,7 +85,7 @@ await skeleton.done();                     // revealed, overlay removed
 ```html
 <section data-crosshair="loading" data-crosshair-reveal="blink">…</section>
 <script type="module">
-  import { watch } from "./crosshair-skeleton.js";
+  import { watch } from "./crosshair-skeleton.js"; // the copied file (bare names need a bundler or an import map)
   watch(); // once per page: "loading" starts a skeleton, any other value (or removing it) reveals
 </script>
 ```
@@ -95,52 +96,125 @@ To keep server-rendered placeholder content from flashing before the script runs
 [data-crosshair="loading"] > :not(.cs-ov) { opacity: 0; }
 ```
 
-**React / Next.js** (client component)
+Pick the line for the project's stack. Every one of these is tested against the real framework (load, reveal with real data, reload, unmount mid-load, no console errors), and the React and Vue adapters also server-render cleanly.
+
+| Stack | Use |
+|---|---|
+| React, Next.js, Remix, Preact (`preact/compat`) | `useCrosshair` from `crosshair-skeleton/react` |
+| Vue 3, Nuxt | `v-crosshair` from `crosshair-skeleton/vue` |
+| Svelte 5, SvelteKit | `use:skeleton` from `crosshair-skeleton/svelte` |
+| Solid, Angular, Lit and other web components | the core `crosshair()` in the framework's effect or lifecycle hook |
+| Astro, plain HTML, Alpine, htmx, Rails, Laravel, Django | the attribute API, or `crosshair()` in a script |
+
+**React / Next.js / Preact**
 
 ```jsx
 "use client";
-import { useLayoutEffect, useRef } from "react";
-import { crosshair } from "@/lib/crosshair-skeleton.js";
+import { useCrosshair } from "crosshair-skeleton/react";
 
-export function useCrosshair(loading, options) {
-  const ref = useRef(null);
-  const run = useRef(null);
-  useLayoutEffect(() => {
-    if (!ref.current) return;
-    if (loading) run.current = crosshair(ref.current, options);
-    else run.current?.done();
-  }, [loading]);
-  useLayoutEffect(() => () => run.current?.cancel(), []);
-  return ref;
+export function RevenueCard({ data }) {
+  const ref = useCrosshair(!data, { reveal: "fade" });
+  return <div ref={ref} className="card">{data ? <Revenue data={data} /> : <Revenue placeholder />}</div>;
 }
-
-// <div ref={useCrosshair(isLoading)} className="card">{data ? <Stats data={data} /> : <Stats placeholder />}</div>
 ```
 
-Or with the attribute API: call `watch()` once in a root client component and render `data-crosshair={isLoading ? "loading" : "done"}`.
+Server rendering is safe: the hook does nothing on the server. It returns a callback ref and follows the element itself, so Strict Mode, a target that mounts later and a replaced (re-keyed) element are all handled.
 
-**Vue**
+**Vue / Nuxt**
 
 ```js
-import { ref, watch as vueWatch, onBeforeUnmount } from "vue";
-import { crosshair } from "@/lib/crosshair-skeleton.js";
-const el = ref(null); let run;
-vueWatch(loading, (on) => { if (on) run = crosshair(el.value); else run?.done(); }, { flush: "post", immediate: true });
-onBeforeUnmount(() => run?.cancel());
+// main.js (or a Nuxt plugin: nuxtApp.vueApp.use(CrosshairSkeleton))
+import CrosshairSkeleton from "crosshair-skeleton/vue";
+app.use(CrosshairSkeleton);
 ```
 
-**Svelte** (action)
+```html
+<div class="card" v-crosshair="!data">…</div>
+<div class="card" v-crosshair="{ loading: !data, reveal: 'blink' }">…</div>
+```
+
+Or import `{ vCrosshair }` locally in `<script setup>`.
+
+**Svelte / SvelteKit**
+
+```svelte
+<script>
+  import { skeleton } from "crosshair-skeleton/svelte";
+  let { data } = $props();
+</script>
+
+<div class="card" use:skeleton={!data}>…</div>
+```
+
+**Solid**
 
 ```js
-import { crosshair } from "$lib/crosshair-skeleton.js";
-export function skeleton(node, loading) {
-  let run = loading ? crosshair(node) : null;
-  return {
-    update(next) { if (next && !run) run = crosshair(node); else if (!next && run) { run.done(); run = null; } },
-    destroy() { run?.cancel(); },
-  };
+import { createEffect, on, onCleanup } from "solid-js";
+import { crosshair } from "crosshair-skeleton";
+
+function Card(props) {
+  let el, run;
+  createEffect(on(() => !props.data, (loading) => { if (loading) run = crosshair(el); else run?.done(); }));
+  onCleanup(() => run?.cancel());
+  return <div ref={el} class="card">…</div>;
 }
-// <div use:skeleton={loading}>…</div>
+```
+
+**Angular** (standalone directive)
+
+```ts
+import { Directive, ElementRef, Input, OnChanges, OnDestroy } from "@angular/core";
+import { crosshair, type CrosshairRun } from "crosshair-skeleton";
+
+@Directive({ selector: "[crosshair]", standalone: true })
+export class CrosshairDirective implements OnChanges, OnDestroy {
+  @Input("crosshair") loading = false;
+  private run?: CrosshairRun;
+  constructor(private el: ElementRef<HTMLElement>) {}
+  ngOnChanges() { if (this.loading) this.run = crosshair(this.el.nativeElement); else this.run?.done(); }
+  ngOnDestroy() { this.run?.cancel(); }
+}
+// <div class="card" [crosshair]="!data">…</div>
+```
+
+**Lit and web components** (shadow DOM is supported: the styles are added to the element's own shadow root)
+
+```js
+updated(changed) {
+  if (!changed.has("data")) return;
+  const card = this.renderRoot.querySelector(".card");
+  if (!this.data) this.run = crosshair(card); else this.run?.done();
+}
+disconnectedCallback() { super.disconnectedCallback(); this.run?.cancel(); }
+```
+
+For the attribute API inside a shadow root, call `watch(this.renderRoot)`.
+
+**Alpine**
+
+```html
+<div class="card" :data-crosshair="data ? 'done' : 'loading'">…</div>
+<script type="module">import { watch } from "./crosshair-skeleton.js"; watch();</script>
+```
+
+**htmx**: put the skeleton on a wrapper and swap into an inner element, so the swap doesn't remove the overlay.
+
+```html
+<div class="card" data-skeleton><div class="body" hx-get="/revenue" hx-trigger="load">…placeholder…</div></div>
+<script type="module">
+  import { crosshair } from "./crosshair-skeleton.js";
+  const runs = new WeakMap(); // one skeleton per card, so concurrent requests never reveal each other
+  const card = (e) => e.detail.elt.closest("[data-skeleton]");
+  document.body.addEventListener("htmx:beforeRequest", (e) => { const c = card(e); if (c) runs.set(c, crosshair(c)); });
+  document.body.addEventListener("htmx:afterSettle", (e) => { const c = card(e); if (c) runs.get(c)?.done(); });
+  // Requests that end without a swap: errors and aborts show the content, a 204 finishes normally
+  document.body.addEventListener("htmx:afterRequest", (e) => {
+    const c = card(e); if (!c) return;
+    if (!e.detail.successful) runs.get(c)?.cancel();
+    else if (e.detail.xhr.status === 204) runs.get(c)?.done();
+  });
+  document.body.addEventListener("htmx:sendAbort", (e) => { const c = card(e); if (c) runs.get(c)?.cancel(); });
+</script>
 ```
 
 ## Options
@@ -184,10 +258,10 @@ Use the project's existing colour tokens when overriding; don't introduce new he
 What the runtime already does (keep it that way when integrating):
 
 - No dependencies, fonts, images or network requests; one small module.
-- The build (about 1.5 s) animates SVG strokes and one clip, measured at under 3 ms of render work per frame (p95) with ten skeletons on screen, at a steady 60 fps.
+- The build (about 1.5 s) animates SVG strokes and one clip, measured at under 5 ms of render work per frame (p95) in Chrome and WebKit and under 10 ms in Firefox, with 5 to 9 skeletons building at once.
 - The wait animates only `opacity` on two layers per skeleton, which runs on the compositor: about 0.3 ms per frame of main-thread work. Every skeleton breathes in phase.
 - Off-screen skeletons are not built until they come within 100 px of the viewport, and their breathing pauses when they scroll away.
-- Skeletons that start together cascade in 60 ms apart (half a second at most), so a page of them never builds in the same frame.
+- Skeletons that start together cascade in 60 ms apart, so a page of them doesn't build in the same frame. The cascade is capped at half a second: past about eight at once, the rest start together at that mark.
 - Tested in Chrome 152, Firefox 158 and WebKit 26.6 (Safari's engine): light and dark, 375 to 1440 px, every reveal, no horizontal scroll, no leftovers.
 - The DOM is read once, when the build starts (shapes and grid lines are capped), never per frame.
 - After the reveal every animation is cancelled and the overlay is removed: zero leftovers.
@@ -201,7 +275,7 @@ What the integration must do:
 
 ## Accessibility
 
-While loading the element gets `aria-busy="true"` and the overlay is `aria-hidden`. The real content stays in the DOM (hidden with `opacity`), so nothing is announced twice. Reduced motion is respected automatically.
+While loading the element gets `aria-busy="true"` (its own earlier value is restored afterwards) and the overlay is `aria-hidden`. The placeholder content stays in the DOM, hidden and `inert` (its earlier `inert` state is restored), so it can't be focused, clicked or read out while it is a placeholder. Reduced motion is respected automatically.
 
 ## Checklist before calling it done
 
