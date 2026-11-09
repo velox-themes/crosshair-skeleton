@@ -30,15 +30,11 @@
 </p>
 
 <p align="center">
-  <a href="media/crosshair-skeleton.mp4">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="media/demo-dark.gif">
-      <img alt="Crosshair Skeleton: corners lock onto a headline, a stats card, a line chart and an article, a grid maps them, cursors select each element and leave skeleton blocks, then the real content cascades in" src="media/demo-light.gif" width="800">
-    </picture>
-  </a>
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="media/demo-dark.gif">
+    <img alt="Crosshair Skeleton: corners lock onto a headline, a stats card, a line chart and an article, a grid maps them, cursors select each element and leave skeleton blocks, then the real content cascades in" src="media/demo-light.gif" width="800">
+  </picture>
 </p>
-
-<p align="center">▶ <a href="media/crosshair-skeleton.mp4"><b>Watch the full demo</b></a>: cascade, flow and fade reveals, in light and dark.</p>
 
 Crosshair Skeleton is a loading state for anything that waits on data. Crosshair corners lock onto the element, a grid maps it, and cursors select every element inside, size labels and all, leaving a skeleton block in its exact shape. When the data lands, the real content swaps in element by element: no shimmer, no layout jump. This repository is the whole thing: one dependency-free ES module, adapters for React, Vue and Svelte, and an agent skill for Claude Code and Codex.
 
