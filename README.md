@@ -38,6 +38,8 @@
 
 Crosshair Skeleton is a skeleton loader (a skeleton screen) for anything that waits on data. Crosshair corners lock onto the element, a grid maps it, and cursors select every element inside, size labels and all, leaving a skeleton block in its exact shape. When the data lands, the real content swaps in element by element: no shimmer, no layout jump. This repository is the whole thing: one dependency-free ES module, adapters for React and Next.js, Vue and Svelte, and an agent skill for Claude Code and Codex.
 
+<br>
+
 ## Features
 
 - **Draws your real layout.** It reads what is inside the element: one bar per line of text at its real width, and buttons, chips, images, charts and inputs as blocks in their own shape and corner radius. When the data arrives it measures again, so the swap always lands on the real layout.
@@ -51,6 +53,8 @@ Crosshair Skeleton is a skeleton loader (a skeleton screen) for anything that wa
 | Drawing: cursors select each element | Waiting, in dark mode |
 | --- | --- |
 | ![Cursors selecting the footer labels of a stats card and an article card, with size labels under each selection, while a headline, a bar chart and a line chart are already drawn as skeleton blocks](media/drawing.jpg) | ![The same headline, stats card, line chart and article as dark skeleton blocks on a faint grid, with crosshair corners and AWAIT size readouts](media/waiting-dark.jpg) |
+
+<br>
 
 ## Install
 
@@ -71,6 +75,8 @@ Copy this folder into your agent's skills directory:
 | Others that read `SKILL.md` | Their skills folder |
 
 Agents applying the skill should follow [AGENT-GUIDE.md](./AGENT-GUIDE.md): the integration procedure, pitfalls seen on production UI, and a browser verification checklist.
+
+<br>
 
 ## Usage
 
@@ -111,6 +117,8 @@ const ref = useCrosshair(!data);           // <div ref={ref}>…</div>
 
 Each adapter is tested against the real framework: the skeleton appears, the real data is revealed, a reload restarts it and an unmount mid-load leaves nothing behind. Tested: React 19 (Strict Mode), Preact 10, Vue 3.5, Svelte 5, Solid 1.9, Lit 3 (shadow DOM), Alpine 3 and htmx 2. React and Vue also server-render cleanly (Next.js, Nuxt). Solid, Angular, Lit, Astro, Alpine and htmx patterns, every option, part hints and theming are in [SKILL.md](./SKILL.md).
 
+<br>
+
 ## Options
 
 | Option | Default | |
@@ -123,9 +131,13 @@ Each adapter is tested against the real framework: the skeleton appears, the rea
 | `labels` | `true` | `W × H` size labels under each selection |
 | `speed` | `1` | `2` is twice as fast |
 
+<br>
+
 ## How it knows the shape
 
 It draws whatever is inside the element when loading starts. Render your real component with placeholder data at its final size and you get its exact structure: one bar per line of text at its real width, and buttons, chips, images, charts and inputs as blocks in their own shape and corner radius. Table rows, list items and chart bars are drawn as groups, all at once rather than one by one. When the data arrives it measures again, so the swap always lands on the real layout. An empty container falls back to its own selection, grid and corners. `data-crosshair-part="skip | box"` overrides any part.
+
+<br>
 
 ## Performance
 
@@ -141,6 +153,8 @@ On data-heavy pages (Chrome, 4× CPU throttling): 24 dashboard cards plus a 300-
 
 Skeletons that start together cascade in 60 ms apart, `prefers-reduced-motion` gets a static skeleton and a short fade, and nothing is left in the DOM after the reveal.
 
+<br>
+
 ## Try it locally
 
 ```bash
@@ -149,9 +163,13 @@ npx serve .
 
 Then open `demo.html` (21 examples with slow, fast and held loads, all three reveals and both themes) or `bench.html`. Opening the files directly from disk does not work: browsers block ES modules on `file://`.
 
+<br>
+
 ## Made by Velox Themes
 
 Crosshair Skeleton is free and open source, made by **[Velox Themes](https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton)**. If you build websites for clients, Velox Themes also has polished sections, components and templates you can copy straight into your project.
+
+<br>
 
 ## License
 
