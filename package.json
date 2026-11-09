@@ -1,7 +1,7 @@
 {
   "name": "crosshair-skeleton",
   "version": "1.0.0",
-  "description": "A loading skeleton that locks onto any element, maps a grid over it, draws a skeleton block for everything inside with design-tool cursors and selections, then swaps the real content in element by element. No dependencies, any framework, light and dark.",
+  "description": "Animated skeleton loader for React, Next.js, Vue, Svelte and plain JS. Draws a loading skeleton in your real layout. Light and dark, no dependencies.",
   "type": "module",
   "main": "./crosshair-skeleton.js",
   "module": "./crosshair-skeleton.js",
@@ -67,7 +67,13 @@
     "react",
     "vue",
     "svelte",
-    "agent-skill"
+    "agent-skill",
+    "loading-skeleton",
+    "skeleton-screen",
+    "skeleton-loading",
+    "react-skeleton",
+    "nextjs",
+    "loading-animation"
   ],
   "license": "MIT",
   "author": "Velox Themes (https://library.veloxthemes.com)",
