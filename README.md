@@ -1,21 +1,60 @@
-# Crosshair Skeleton
+<p align="center">
+  <a href="https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="media/logo-dark.svg">
+      <img src="media/logo.svg" alt="Crosshair Skeleton" width="64" height="64">
+    </picture>
+  </a>
+</p>
 
-**A loading skeleton that measures your UI before it arrives.** Crosshair corners lock onto the element, a grid maps it, then cursors drag a selection around every element inside, size labels and all, and leave a skeleton block in its place. When the data lands, the real elements swap in one by one: no shimmer, no layout jump.
+<h1 align="center">Crosshair Skeleton</h1>
 
-<a href="media/crosshair-skeleton.mp4">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="media/demo-dark.gif">
-    <img alt="Crosshair Skeleton: corners lock onto a headline, a stats card, a line chart and an article, a grid maps them, cursors select each element and leave skeleton blocks, then the real content cascades in" src="media/demo-light.gif" width="800">
-  </picture>
-</a>
+<p align="center">
+  A loading skeleton that measures your interface before the data arrives.<br>
+  Any element, any framework, light and dark, and light on the CPU.
+</p>
 
-▶ **[Watch the full demo](media/crosshair-skeleton.mp4)**: cascade, flow and fade reveals, in light and dark.
+<p align="center">
+  <a href="#try-it-locally">Demo</a> ·
+  <a href="#usage">Usage</a> ·
+  <a href="./AGENT-GUIDE.md">Agent guide</a> ·
+  <a href="https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton">Made by Velox Themes</a>
+</p>
 
-- **Any element:** cards, charts, tables, forms, text, images, lists, video, code. It reads what is inside and draws it, text line by text line.
-- **Any framework:** plain JavaScript, React, Next.js, Vue, Svelte, Astro, Angular. One ES module, no dependencies, no CSS file, no fonts, no images.
-- **Light and dark:** every colour comes from the element's own text colour, so it matches your theme with no setup.
-- **Cheap to run:** the long wait runs on the compositor, off-screen skeletons wait to build, and everything is removed after the reveal.
-- **Agent skill included:** drop it into Claude Code or Codex and ask for "a crosshair loading skeleton on the revenue card".
+<p align="center">
+  <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <a href="#install"><img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-2ea043"></a>
+  <a href="#performance"><img alt="About 17 KB gzipped" src="https://img.shields.io/badge/gzip-17%20KB-555555"></a>
+  <a href="#works-with-your-stack"><img alt="React, Vue and Svelte adapters" src="https://img.shields.io/badge/adapters-React%20%C2%B7%20Vue%20%C2%B7%20Svelte-149eca?logo=react&logoColor=white"></a>
+  <a href="#as-an-agent-skill"><img alt="Agent skill for Claude Code and Codex" src="https://img.shields.io/badge/agent%20skill-Claude%20Code%20%C2%B7%20Codex-0a0a0a"></a>
+</p>
+
+<p align="center">
+  <a href="media/crosshair-skeleton.mp4">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="media/demo-dark.gif">
+      <img alt="Crosshair Skeleton: corners lock onto a headline, a stats card, a line chart and an article, a grid maps them, cursors select each element and leave skeleton blocks, then the real content cascades in" src="media/demo-light.gif" width="800">
+    </picture>
+  </a>
+</p>
+
+<p align="center">▶ <a href="media/crosshair-skeleton.mp4"><b>Watch the full demo</b></a>: cascade, flow and fade reveals, in light and dark.</p>
+
+Crosshair Skeleton is a loading state for anything that waits on data. Crosshair corners lock onto the element, a grid maps it, and cursors select every element inside, size labels and all, leaving a skeleton block in its exact shape. When the data lands, the real content swaps in element by element: no shimmer, no layout jump. This repository is the whole thing: one dependency-free ES module, adapters for React, Vue and Svelte, and an agent skill for Claude Code and Codex.
+
+## Features
+
+- **Draws your real layout.** It reads what is inside the element: one bar per line of text at its real width, and buttons, chips, images, charts and inputs as blocks in their own shape and corner radius. When the data arrives it measures again, so the swap always lands on the real layout.
+- **Tables, lists and charts in one go.** Table rows, list items, cards of one kind and chart bars are drawn as groups, all at once rather than one by one.
+- **Any element, any framework.** Cards, charts, tables, forms, text, images, lists, video and code, in plain JavaScript, React, Next.js, Vue, Nuxt, Svelte, SvelteKit, Solid, Angular, Lit, Astro, Alpine or htmx. No CSS file, fonts or images to add.
+- **Light and dark.** Every colour comes from the element's own text colour and the background behind it, so it matches your theme with no setup and follows a theme switch while it waits.
+- **Light on the CPU, big pages included.** The long wait runs on the compositor with no JavaScript, off-screen skeletons don't build until they scroll in, and only what is on screen is animated: a skeleton over 3,000 rows hands over in one short task.
+- **Never in the way.** Loads under 150 ms show nothing, a shown skeleton never flashes, the placeholder is `inert` and `aria-busy` while loading, reduced motion gets a static skeleton, and nothing is left in the DOM afterwards.
+- **An agent skill.** Drop the folder into Claude Code or Codex and ask for "a crosshair loading skeleton on the revenue card". [AGENT-GUIDE.md](./AGENT-GUIDE.md) gives agents the procedure, the pitfalls and a browser checklist.
+
+| Drawing: cursors select each element | Waiting, in dark mode |
+| --- | --- |
+| ![Cursors selecting the footer labels of a stats card and an article card, with size labels under each selection, while a headline, a bar chart and a line chart are already drawn as skeleton blocks](media/drawing.jpg) | ![The same headline, stats card, line chart and article as dark skeleton blocks on a faint grid, with crosshair corners and AWAIT size readouts](media/waiting-dark.jpg) |
 
 ## Install
 
@@ -116,7 +155,7 @@ Then open `demo.html` (21 examples with slow, fast and held loads, all three rev
 
 ## Made by Velox Themes
 
-Crosshair Skeleton is free and open source, made by **[Velox Themes](https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton)**. If you build websites for clients, **[Velox Themes](https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton)** has polished sections, components and templates you can copy straight into your project.
+Crosshair Skeleton is free and open source, made by **[Velox Themes](https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton)**. If you build websites for clients, Velox Themes also has polished sections, components and templates you can copy straight into your project.
 
 ## License
 
