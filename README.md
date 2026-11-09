@@ -31,8 +31,8 @@
 
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="media/demo-dark.gif">
-    <img alt="Crosshair Skeleton: corners lock onto a headline, a stats card, a line chart and an article, a grid maps them, cursors select each element and leave skeleton blocks, then the real content cascades in" src="media/demo-light.gif" width="800">
+    <source media="(prefers-color-scheme: dark)" srcset="media/preview-dark.gif">
+    <img alt="Crosshair Skeleton: corners lock onto a headline, a stats card, a line chart and an article, a grid maps them, cursors select each element and leave skeleton blocks, then the real content cascades in" src="media/preview-light.gif" width="800">
   </picture>
 </p>
 
