@@ -10,8 +10,8 @@
 <h1 align="center">Crosshair Skeleton</h1>
 
 <p align="center">
-  A loading skeleton that measures your interface before the data arrives.<br>
-  Any element, any framework, light and dark, and light on the CPU.
+  An animated skeleton loader that draws a loading skeleton in your real layout.<br>
+  React, Next.js, Vue, Svelte or plain JS. Light and dark, no dependencies.
 </p>
 
 <p align="center">
@@ -25,18 +25,18 @@
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
   <a href="#install"><img alt="No dependencies" src="https://img.shields.io/badge/dependencies-none-2ea043"></a>
   <a href="#performance"><img alt="About 17 KB gzipped" src="https://img.shields.io/badge/gzip-17%20KB-555555"></a>
-  <a href="#works-with-your-stack"><img alt="React, Vue and Svelte adapters" src="https://img.shields.io/badge/adapters-React%20%C2%B7%20Vue%20%C2%B7%20Svelte-149eca?logo=react&logoColor=white"></a>
+  <a href="#react-nextjs-vue-and-svelte"><img alt="React, Vue and Svelte adapters" src="https://img.shields.io/badge/adapters-React%20%C2%B7%20Vue%20%C2%B7%20Svelte-149eca?logo=react&logoColor=white"></a>
   <a href="#as-an-agent-skill"><img alt="Agent skill for Claude Code and Codex" src="https://img.shields.io/badge/agent%20skill-Claude%20Code%20%C2%B7%20Codex-0a0a0a"></a>
 </p>
 
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="media/preview-dark.gif">
-    <img alt="Crosshair Skeleton: corners lock onto a headline, a stats card, a line chart and an article, a grid maps them, cursors select each element and leave skeleton blocks, then the real content cascades in" src="media/preview-light.gif" width="800">
+    <img alt="Crosshair Skeleton, an animated skeleton loader: corners lock onto a headline, a stats card, a line chart and an article, a grid maps them, cursors select each element and leave skeleton blocks, then the real content cascades in" src="media/preview-light.gif" width="800">
   </picture>
 </p>
 
-Crosshair Skeleton is a loading state for anything that waits on data. Crosshair corners lock onto the element, a grid maps it, and cursors select every element inside, size labels and all, leaving a skeleton block in its exact shape. When the data lands, the real content swaps in element by element: no shimmer, no layout jump. This repository is the whole thing: one dependency-free ES module, adapters for React, Vue and Svelte, and an agent skill for Claude Code and Codex.
+Crosshair Skeleton is a skeleton loader (a skeleton screen) for anything that waits on data. Crosshair corners lock onto the element, a grid maps it, and cursors select every element inside, size labels and all, leaving a skeleton block in its exact shape. When the data lands, the real content swaps in element by element: no shimmer, no layout jump. This repository is the whole thing: one dependency-free ES module, adapters for React and Next.js, Vue and Svelte, and an agent skill for Claude Code and Codex.
 
 ## Features
 
@@ -93,7 +93,7 @@ Declarative, for any framework or server-rendered HTML:
 </script>
 ```
 
-### Works with your stack
+### React, Next.js, Vue and Svelte
 
 ```jsx
 // React, Next.js, Remix, Preact
