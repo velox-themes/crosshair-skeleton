@@ -5,7 +5,7 @@ const read = (value) => (value && typeof value === "object" ? value : { loading:
 
 /**
  * <div use:skeleton={loading}>…</div>
- * <div use:skeleton={{ loading, reveal: "scan" }}>…</div>
+ * <div use:skeleton={{ loading, reveal: "flow" }}>…</div>
  */
 export function skeleton(node, param) {
   let run = null;

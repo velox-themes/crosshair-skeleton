@@ -1,6 +1,6 @@
 ---
 name: crosshair-skeleton
-description: A loading skeleton for any element (cards, charts, graphs, text, headlines, images, lists, tables, forms) that locks on with crosshair corners, measures the element, maps a grid over it, traces the shape of what is inside (text lines, image boxes, chart areas, buttons), breathes while it waits, then hands over to the real content with a fade, blink or scan reveal. One dependency-free ES module (about 13 KB gzipped, comments included) with tested adapters for React/Next.js/Preact, Vue/Nuxt and Svelte/SvelteKit, plus patterns for Solid, Angular, Lit, Astro, Alpine and htmx, follows light and dark themes automatically, and is built to be cheap on CPU. Use when the user asks for a "loading skeleton", "skeleton loader", "loading state", "placeholder while data loads", "crosshair loader", "blueprint/wireframe loading", "replace the shimmer", "make loading look technical", or wants a nicer loading state for a card, chart, list or page section. Not for button or inline spinners, progress bars, background refreshes of content already on screen, streaming text, or anything the server can render directly.
+description: A loading skeleton for any element (cards, charts, graphs, text, headlines, images, lists, tables, forms) that locks on with crosshair corners, measures the element, maps a grid over it, then cursors drag a selection around every element inside (with size labels) and leave a skeleton block in its place (text lines, images, charts, buttons), breathes while it waits, then hands the real content back element by element (cascade, flow or fade reveal). One dependency-free ES module (about 17 KB gzipped, comments included) with tested adapters for React/Next.js/Preact, Vue/Nuxt and Svelte/SvelteKit, plus patterns for Solid, Angular, Lit, Astro, Alpine and htmx, follows light and dark themes automatically, and is built to be cheap on CPU. Use when the user asks for a "loading skeleton", "skeleton loader", "loading state", "placeholder while data loads", "crosshair loader", "blueprint/wireframe loading", "replace the shimmer", "make loading look technical", or wants a nicer loading state for a card, chart, list or page section. Not for button or inline spinners, progress bars, background refreshes of content already on screen, streaming text, or anything the server can render directly.
 license: MIT (see LICENSE)
 ---
 
@@ -9,11 +9,11 @@ license: MIT (see LICENSE)
 A loading state that looks like the interface is being measured and mapped while the data is on its way:
 
 1. **Lock** – four crosshair corners snap in at the top-left and blink twice.
-2. **Measure** – the corners travel out to the element's real corners; a readout counts the size up.
+2. **Measure** – the element is selected like in a design tool: its selection box, handles and size label are dragged out to its real corners, and the readout counts the size up.
 3. **Map** – a fine grid sweeps in from the origin, then its intersection dots.
-4. **Trace** – the shape of what is inside is outlined: section boxes, every line of text, images (box with a cross), charts (box with guides), buttons and inputs.
-5. **Wait** – the grid and trace breathe slowly for as long as the data takes.
-6. **Reveal** – when the data is in, the real content arrives under the trace (`fade`, `blink` per section, or a dithered `scan` line) and the skeleton removes itself completely.
+4. **Draw** – up to three cursors take turns on the elements inside. Each one travels to an element, presses, drags a selection box around it (size label underneath), and a skeleton block settles in its place: one bar per line of text, and buttons, chips, images and charts in their own shape and corner radius.
+5. **Wait** – the grid breathes slowly for as long as the data takes.
+6. **Reveal** – when the data is in, the real elements replace their blocks one by one in reading order (`cascade`), strictly top to bottom (`flow`) or all at once (`fade`), and the skeleton removes itself completely.
 
 Loads faster than 150 ms never show a skeleton. Once shown, it stays at least 600 ms and never hands over mid-move, so it never flashes.
 
@@ -37,7 +37,7 @@ Decide this first. A skeleton is the right tool only when all of these are true:
 | A dashboard whose widgets load separately | One skeleton per widget; they cascade in and breathe in sync |
 | A grid of cards from one request | One skeleton on the grid; if each card loads separately, one per card is fine (20+ is fine) |
 | Lazy sections below the fold | One per section; they don't build until scrolled into view |
-| A hero or section waiting on CMS data | One skeleton, `reveal: "scan"` suits images and heroes |
+| A hero or section waiting on CMS data | One skeleton on the section |
 
 **Don't use it for (use this instead):**
 
@@ -54,49 +54,48 @@ Decide this first. A skeleton is the right tool only when all of these are true:
 | Content the server can render directly (SSR, static generation) | Render it on the server: no skeleton beats a fast first paint |
 | Error and empty states | A real error or empty state (drive the skeleton by request status, so errors reveal) |
 
-**Design fit.** The look is precise and technical (crosshairs, grid, wireframe). It suits product, data, developer, design-tool and agency interfaces. On a soft or playful brand, check with the user before applying it everywhere; `pulse: false` and `readout: false` tone it down.
+**Design fit.** The look is precise and technical (crosshairs, a grid, design-tool cursors and selections). It suits product, data, developer, design-tool and agency interfaces. On a soft or playful brand, check with the user before applying it everywhere; `cursors: false`, `labels: false`, `readout: false` and `pulse: false` tone it down.
 
 **Many at once** is fine (a grid of 20 cards): skeletons that start together cascade in, every one breathes in sync, off-screen ones are not built until they scroll in, and the wait runs on the compositor.
 
 ## How it knows the shape
 
-While loading, the real content usually isn't there yet. The runtime traces **whatever is inside the element at the moment loading starts**:
+While loading, the real content usually isn't there yet. The runtime draws **whatever is inside the element at the moment loading starts**:
 
-| What is inside | What gets traced |
+| What is inside | What gets drawn |
 |---|---|
-| The real component rendered with placeholder data (recommended) | Its exact structure: sections, text lines, images, charts, buttons. Same layout as the result, so nothing jumps. |
+| The real component rendered with placeholder data (recommended) | Its exact structure: text lines, images, charts, buttons, chips. Same layout as the result, so nothing jumps. |
 | Placeholder markup of your own (fixed-size blocks, empty rows) | Those blocks. |
-| Nothing (an empty container with a reserved size) | The outer box, grid and corners only. |
+| Nothing (an empty container with a reserved size) | The element's own selection, grid and corners only. |
 
-**At the handover it traces again.** When `done()` runs, your real content is already rendered (still hidden), so the skeleton measures it once more, resizes the overlay if the size changed, and redraws the outlines exactly onto the real layout in about a quarter of a second while the placeholder's outlines fade out. The reveal therefore always lands on the real UI. While waiting it can only trace the placeholder, so the closer the placeholder is to the real data, the steadier it looks (see [AGENT-GUIDE.md](./AGENT-GUIDE.md#pitfalls-seen-in-real-integrations)).
+**At the handover it measures again.** When `done()` runs, your real content is already rendered (still hidden), so the skeleton measures it once more. If it matches what was drawn, the draw carries on and every element swaps in once its own block has been shown. If it doesn't, the blocks are redrawn exactly on the real layout (a 120 ms cross-fade) and the cascade starts at once. The reveal therefore always lands on the real UI. While waiting it can only draw the placeholder, so the closer the placeholder is to the real data, the steadier it looks (see [AGENT-GUIDE.md](./AGENT-GUIDE.md#pitfalls-seen-in-real-integrations)).
 
 The readout reports the element's outer size (border box), rounded the way DevTools shows it. The overlay never changes the element's layout: if being the last child would switch off a `:last-child` rule (a list's last border, Tailwind `space-y`), it moves itself to the front.
 
-Rules the tracer follows:
+Rules it follows to find the elements to draw:
 
-- Elements with their own text become **text lines** (one bar per rendered line, at the real width).
-- `img`, `video`, `iframe`, `picture`, `[role=img]` become a **box with a cross**.
-- `svg` and `canvas` of 80×48 px or more become a **chart** (box with two guides); smaller ones (icons) a box.
-- `button`, `input`, `select`, `textarea`, `[role=button]` become a **box**.
-- Other elements become structural boxes down to `depth` levels (1 outer box, 2 sections, 3 their children), skipping wrappers that only repeat their parent's box.
-- Capped at 90 shapes and 600 visited elements, however large the element. Shapes are traced in document order; past the cap the rest of the element still gets the fill and grid, just no outlines. On a very large element (a whole page of cards), set `depth: 2` or mark dense regions `data-crosshair-part="box"` so the outline budget covers the whole page.
+- **Text** (an element with its own text, or only inline children) becomes one rounded bar per rendered line, at the real width and 62% of the line height. Icons and chips inside the text keep their own small blocks.
+- **Surfaced text** (a button, chip, badge or bubble: text on its own background or border) becomes one block in its shape and corner radius.
+- `img`, `video`, `iframe`, `picture`, `svg`, `canvas`, `[role=img]`, form controls and `[role=button]` become one block in their own shape and radius.
+- **Repeated rows are drawn in parallel**: three or more siblings of the same kind (table rows and cells, list items, cards with the same class) become one group with one selection, and all their blocks settle and swap in together. A table or list never draws row by row.
+- A run of 6 to 60 simple sibling shapes (chart bars, legend dots, swatches) is one group: one selection around all of them, and every shape settles at once rather than one by one. More than 60 (a heatmap, a calendar), or more than 40 mixed children, becomes one block.
+- Wrappers are looked through, never drawn; empty elements with a background (a coloured bar, an avatar circle) are drawn, empty spacers are not.
+- Capped at 90 elements and 600 visited nodes, however large the element, and the whole draw is squeezed into 2 seconds however many elements there are. Past the cap the rest still gets the fill and grid. On a very large element (a whole page of cards), mark dense regions `data-crosshair-part="box"` so the budget covers the whole page.
 
 **Making placeholder data.** Give it the same shape as the real data, with text of similar length. For images, use a 1×1 transparent data URI so the image's CSS box (`aspect-ratio`, width/height) keeps its size: `data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7`. Keep keys unique in placeholder lists (`${BLANK}#1`, `#2`…). The placeholder is hidden and `inert` while loading, so its text never shows or gets read out.
 
 Hints, when the automatic reading is not what you want:
 
 ```html
-<div data-crosshair-part="skip">…</div>   <!-- not traced (decorations, sticky toolbars) -->
-<div data-crosshair-part="box">…</div>    <!-- one box, don't look inside -->
-<div data-crosshair-part="chart">…</div>  <!-- box with guides (a custom chart made of divs) -->
-<div data-crosshair-part="media">…</div>  <!-- box with a cross -->
+<div data-crosshair-part="skip">…</div>   <!-- not drawn (decorations, sticky toolbars) -->
+<div data-crosshair-part="box">…</div>    <!-- one block, don't look inside (a custom chart made of divs) -->
 ```
 
 ## Install
 
 Prefer the package when the project uses npm: `npm install crosshair-skeleton`, then `import { crosshair, watch } from "crosshair-skeleton"` (TypeScript types included). Otherwise copy [`crosshair-skeleton.js`](./crosshair-skeleton.js) into the project (for example `src/lib/` or `public/vendor/`) and import it by path. Either way that is the whole install: no dependencies, no CSS file, no fonts, no images. Its styles are injected once as a constructable stylesheet (falls back to one `<style>` tag).
 
-Do not rewrite the runtime or retune its timings one by one: the lock, expand, grid, trace and reveal timings are one rhythm. Use the `speed` option instead.
+Do not rewrite the runtime or retune its timings one by one: the lock, expand, grid, draw and reveal timings are one rhythm. Use the `speed` option instead.
 
 ## Wiring
 
@@ -124,7 +123,7 @@ await skeleton.done();                     // revealed, overlay removed
 **Attribute API** (simplest for any framework or server-rendered HTML)
 
 ```html
-<section data-crosshair="loading" data-crosshair-reveal="blink">…</section>
+<section data-crosshair="loading" data-crosshair-reveal="flow">…</section>
 <script type="module">
   import { watch } from "./crosshair-skeleton.js"; // the copied file (bare names need a bundler or an import map)
   watch(); // once per page: "loading" starts a skeleton, any other value (or removing it) reveals
@@ -154,7 +153,7 @@ Pick the line for the project's stack. Every one of these is tested against the 
 import { useCrosshair } from "crosshair-skeleton/react";
 
 export function RevenueCard({ data }) {
-  const ref = useCrosshair(!data, { reveal: "fade" }); // better: useCrosshair(status === "loading"), see below
+  const ref = useCrosshair(!data, { reveal: "cascade" }); // better: useCrosshair(status === "loading"), see below
   return <div ref={ref} className="card">{data ? <Revenue data={data} /> : <Revenue placeholder />}</div>;
 }
 ```
@@ -173,7 +172,7 @@ app.use(CrosshairSkeleton);
 
 ```html
 <div class="card" v-crosshair="!data">…</div>
-<div class="card" v-crosshair="{ loading: !data, reveal: 'blink' }">…</div>
+<div class="card" v-crosshair="{ loading: !data, reveal: 'flow' }">…</div>
 ```
 
 Or import `{ vCrosshair }` locally in `<script setup>`.
@@ -264,35 +263,40 @@ For the attribute API inside a shadow root, call `watch(this.renderRoot)`.
 
 ```js
 crosshair(el, {
-  reveal: "fade",   // "fade" | "blink" (sections flicker on in order) | "scan" (dithered line wipes down)
+  reveal: "cascade", // "cascade" (element by element) | "flow" (strictly top to bottom) | "fade" (all at once)
   grace: 150,       // ms before anything is drawn; faster loads show no skeleton
   minVisible: 600,  // once drawn, stay at least this long
-  trace: "auto",    // "auto" | "box" (outer box only) | "none" (grid and corners only)
-  depth: 3,         // structural box depth
-  cell: 56,         // target grid cell (px); grown automatically so there are never more than ~48 lines
+  trace: "auto",    // "auto" (every element) | "box" (only the element's own selection) | "none" (grid and corners only)
+  cell: 40,         // target grid cell (px); grown automatically so there are never more than ~48 lines
+  cursors: true,    // true (1 to 3, by element count) | false (selections without cursors) | 1 to 4
+  labels: true,     // "W × H" size label under each selection
   readout: "auto",  // phase + size label above the element: true | false | "auto" (≥ 240×120 only)
   pulse: true,      // breathing while waiting
   speed: 1,         // 2 = twice as fast
 });
 ```
 
-Attribute API equivalents: `data-crosshair-reveal`, `data-crosshair-trace`, `data-crosshair-speed`.
+Attribute API equivalents: `data-crosshair-reveal`, `data-crosshair-trace`, `data-crosshair-speed`, `data-crosshair-cursors`.
 
-Picking a reveal: `fade` for most UI; `blink` for dashboards and cards with clear sections (it reads as "systems coming online"); `scan` for images, charts and hero areas.
+Picking a reveal: `cascade` for most UI (each element swaps in for its block, a few at a time); `flow` for reading content (articles, docs, feeds) where top-to-bottom order matters; `fade` for small elements or when many skeletons reveal at once.
 
 ## Light and dark
 
-Every colour is mixed from the element's own text colour (`currentColor`), so the skeleton follows the project's theme, light or dark, with no configuration. Override any of these custom properties on the element or a parent to tune it:
+Every surface colour is mixed from the element's own text colour (`currentColor`) and the background behind it, so the skeleton follows the project's theme, light or dark, with no configuration (it also follows a theme switch while loading). The selections use a neutral grey that reads on both. Override any of these custom properties on the element or a parent to tune it:
 
 | Property | Default | Used for |
 |---|---|---|
-| `--cs-fill` | 7% of the text colour | Skeleton surface |
-| `--cs-line` | 5% | Grid lines |
-| `--cs-dot` | 16% | Grid dots |
-| `--cs-wire` | 24% | Traced shapes |
-| `--cs-mark` | 24% | Crosshair centres |
-| `--cs-arm` | 12% | Crosshair arms |
-| `--cs-scan` | 30% | Scan line |
+| `--cs-fill` | 6% of the text colour | Skeleton surface |
+| `--cs-block` | 13% of the text colour, mixed into the background | Skeleton blocks (opaque) |
+| `--cs-line` | 4% | Grid lines |
+| `--cs-dot` | 12% | Grid dots |
+| `--cs-select` | `#6b6b6b` | Selection boxes, handles, size labels |
+| `--cs-select-ink` | `#fff` | Size label text |
+| `--cs-cursor` | `--cs-select` | Cursors |
+| `--cs-mark` | 16% | Crosshair centres |
+| `--cs-arm` | 8% | Crosshair arms |
+
+Brand the selection with the project's accent (`--cs-select: var(--accent)`) when it fits.
 
 Use the project's existing colour tokens when overriding; don't introduce new hex values into a design system.
 
@@ -301,14 +305,16 @@ Use the project's existing colour tokens when overriding; don't introduce new he
 What the runtime already does (keep it that way when integrating):
 
 - No dependencies, fonts, images or network requests; one small module.
-- The build (about 1.5 s) animates SVG strokes and one clip, measured at under 5 ms of render work per frame (p95) in Chrome and WebKit and under 10 ms in Firefox, with 5 to 9 skeletons building at once.
-- The wait animates only `opacity` on two layers per skeleton, which runs on the compositor: about 0.3 ms per frame of main-thread work. Every skeleton breathes in phase.
+- The build animates SVG strokes and one clip on the compositor; the cursor draw (at most 2 s, however many elements) runs in one shared animation-frame loop that only writes attributes that changed and stops when the draw ends. Measured at under 4 ms of render work per frame (p95) in Chrome and WebKit and under 9 ms in Firefox, with 5 to 9 skeletons building at once.
+- Big pages and lots of data: only elements on screen get a cursor and take part in the cascade; the rest of a long list fades its blocks in and appears at the swap without an animation of its own. A skeleton over a 3,000-row list animates only the few dozen rows in view (measured with 4× CPU throttling: the swap's longest task went from 3.7 s to 67 ms). Selections and size labels exist only while they are visible. The blur at the swap is dropped when more than 24 elements swap in at once.
+- Builds and swaps go through one shared queue that runs in slices of about 8 ms and yields between them, so a page of skeletons starting or finishing together never blocks a frame (24 cards and a 300-row list at 4× throttling: a steady 60 fps, p95 16.8 ms, no long tasks; it was p95 33 ms with frames up to 150 ms). Skeletons scrolled off screen skip painting entirely and catch up when they come back.
+- The wait animates only the grid's `opacity`, which runs on the compositor: no JavaScript runs while waiting. Every skeleton breathes in phase.
 - Off-screen skeletons are not built until they come within 100 px of the viewport, and their breathing pauses when they scroll away.
 - Skeletons that start together cascade in 60 ms apart, so a page of them doesn't build in the same frame. The cascade is capped at half a second: past about eight at once, the rest start together at that mark.
-- Tested in Chrome 152, Firefox 158 and WebKit 26.6 (Safari's engine): light and dark, 375 to 1440 px, every reveal, no horizontal scroll, no leftovers.
-- The DOM is read once, when the build starts (shapes and grid lines are capped), never per frame.
+- Tested in Chrome 153, Firefox 159 and WebKit 26.6 (Safari's engine): light and dark, 375 to 1440 px, every reveal, no horizontal scroll, no leftovers.
+- The DOM is read when the build starts and once more at the handover (elements and grid lines are capped), never per frame.
 - After the reveal every animation is cancelled and the overlay is removed: zero leftovers.
-- `prefers-reduced-motion`: no build or blinking, just a static skeleton and a 200 ms fade.
+- `prefers-reduced-motion`: no build, cursors or blinking, just the static blocks and a 200 ms fade.
 
 What the integration must do:
 

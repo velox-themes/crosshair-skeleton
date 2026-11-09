@@ -9,7 +9,7 @@ Read this before integrating the skeleton into a real project. [SKILL.md](./SKIL
 0. **Check it fits.** Go through [When to use it, and when not](./SKILL.md#when-to-use-it-and-when-not) for each loading state you find. Async content, a wait often over 300 ms, a layout known before the data, an area of about 80 × 40 px or more: all four, or use the alternative that table suggests. Never hide content that is already on screen during a background refresh.
 1. **Find the loading state.** Search for `Loading`, `isLoading`, `status === "loading"`, `if (!data) return`, spinners and `Suspense` fallbacks. Note which request fills which part of the page.
 2. **Decide the scope: one skeleton per request.** One fetch that fills the whole page gets one skeleton over that page's content, even when it is page-sized. Separate requests (a sidebar widget, a comments list) each get their own. Never wrap the app shell or the navigation.
-3. **Make the real layout render while loading.** Replace the early `return <p>Loading…</p>` with the real component rendered from placeholder data of the same type (see the worked example). This is what the skeleton traces, and it removes layout shift.
+3. **Make the real layout render while loading.** Replace the early `return <p>Loading…</p>` with the real component rendered from placeholder data of the same type (see the worked example). This is what the skeleton draws, and it removes layout shift.
 4. **Pick the host element.** Use an element *inside* the page's padding, not the padded container itself: the size readout sits 22 px above the top edge and the corners reach 28 px past each corner, so a host flush with the top of the page loses them. Never a bare `<img>`, `<video>` or `<canvas>` (wrap it).
 5. **Install and wire.** `npm install crosshair-skeleton`, then the adapter for the stack (`crosshair-skeleton/react`, `/vue`, `/svelte`) or `crosshair()` / `watch()` from the core. Drive it with a *loading* flag, not with `!data` (step 6).
 6. **Handle errors and retries.** With `useCrosshair(!data)`, a failed request leaves the skeleton breathing forever. Use the request status (`useCrosshair(status === "loading")`) so an error reveals your error state. A refetch that sets the status back to loading restarts the skeleton on the same element.
@@ -62,8 +62,8 @@ The placeholder is hidden, `inert` and `aria-busy` while loading, so its text is
 
 | What happened | Why | Do this |
 |---|---|---|
-| Nothing to trace | The component returned a "Loading…" line instead of its layout | Render the layout from placeholder data (step 3) |
-| While waiting, the outlines didn't line up with the real UI (a status chip was missing, lines had different widths) | The placeholder left out an optional part that the real data usually has (`owned: false` hid the "Purchased" chip) and used text of different lengths | Mirror the real data: turn on the optional parts that are usually present (badges, chips, buttons), use text of similar length. The handover re-traces the real content regardless, so the reveal always lands exactly |
+| Nothing to draw | The component returned a "Loading…" line instead of its layout | Render the layout from placeholder data (step 3) |
+| While waiting, the skeleton blocks didn't line up with the real UI (a status chip was missing, lines had different widths) | The placeholder left out an optional part that the real data usually has (`owned: false` hid the "Purchased" chip) and used text of different lengths | Mirror the real data: turn on the optional parts that are usually present (badges, chips, buttons), use text of similar length. The handover measures the real content again regardless, so the reveal always lands exactly |
 | The element grew by 1 px while loading | The overlay, as the last child, switched off a `:last-child` rule | Fixed in the runtime (it moves itself to the front when that happens). A plain wrapper `<div>` as the host avoids it entirely |
 | Readout and top corners missing | The host started at the very top of the page / inside `overflow: hidden` | Put the ref on an inner element inside the padding (step 4) |
 | Image boxes collapsed in the placeholder | `src` was empty or missing | 1×1 transparent data URI; keep the image's CSS size |
@@ -71,7 +71,9 @@ The placeholder is hidden, `inert` and `aria-busy` while loading, so its text is
 | Skeleton breathing forever after a failed request | Driven by `!data` | Drive it by request status (step 6) |
 | Updated the package but the page still ran the old code | `next dev` caches `node_modules` | Restart the dev server (clear `.next` if it persists); confirm by searching the served page chunk |
 | Worry about horizontal scroll on phones | Corners reach 28 px past the element | Not an issue: the overlay uses layout containment, so it is clipped, never scrolled to (verified at 375 px) |
-| Lower sections of a long page not outlined | 90-shape budget (a full product page used 81) | On bigger pages use `depth: 2` or mark dense grids `data-crosshair-part="box"` |
+| Lower sections of a long page not drawn | 90-element budget | On bigger pages mark dense grids and repeated cards `data-crosshair-part="box"` so each counts once |
+| Worry about a list or table with thousands of rows under one skeleton | Every row is real DOM | Nothing to do: only the rows on screen are drawn and animated, the rest appear without animations. Reserve the list's height, and mark repeated row parts `data-crosshair-part="box"` if the 90-element budget runs out before the fold |
+| Too many cursors and labels on a busy page | Every small element gets its own selection | `labels: false`, `cursors: 1` or `cursors: false` tone it down; mark decorative parts `data-crosshair-part="skip"` |
 | Placeholder content flashed before the skeleton on a server-rendered page (SSR/SSG, adapters included) | The HTML paints before JavaScript hydrates | Render `data-crosshair={isLoading ? "loading" : "done"}` on the host and add `[data-crosshair="loading"] > :not(.cs-ov) { opacity: 0 }` to the global CSS. Client-only pages don't need it |
 | The skeleton was invisible in a Tailwind v4 app (fixed in the runtime) | Tailwind v4 hides `[hidden]` with `!important` inside a cascade layer, which beats unlayered `!important` | Don't add `hidden` (or other display-changing attributes) to the overlay or the host while loading |
 | The skeleton disappeared during loading | The app replaced the host's own `innerHTML` | Render into the host's children, or put the skeleton on a wrapper and swap an inner element |
@@ -80,8 +82,8 @@ The placeholder is hidden, `inert` and `aria-busy` while loading, so its text is
 
 Add a way to slow the request (a `?delay=` parameter on a dev API, or the browser's network throttling), then check:
 
-- [ ] **Slow load (3 s or more):** the skeleton appears within about 200 ms and traces the real sections; the readout equals the element's size in DevTools, and the element's height does not change when the skeleton appears.
-- [ ] **At the handover:** the outlines redraw onto the real content and the content arrives exactly under them.
+- [ ] **Slow load (3 s or more):** the skeleton appears within about 200 ms, the cursors select the real elements and leave blocks in their shape; the readout equals the element's size in DevTools, and the element's height does not change when the skeleton appears.
+- [ ] **At the handover:** each real element swaps in exactly where its block was (or, if the placeholder differed, the blocks redraw onto the real layout first).
 - [ ] **Fast load (under 150 ms):** no skeleton at all, just the content.
 - [ ] **While loading:** the host has `aria-busy="true"` and `inert`; the placeholder text is invisible and can't be focused.
 - [ ] **After the reveal:** the real content shows; no `.cs-ov`, `data-cs-hide`, `inert` or `aria-busy` is left (unless the app set them itself); no animations remain.

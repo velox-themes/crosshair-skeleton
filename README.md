@@ -1,17 +1,17 @@
 # Crosshair Skeleton
 
-**A loading skeleton that measures your UI before it arrives.** Crosshair corners lock onto the element, a grid maps it, the shape of what is inside is traced line by line, and when the data lands the real content takes its place: no shimmer, no layout jump.
+**A loading skeleton that measures your UI before it arrives.** Crosshair corners lock onto the element, a grid maps it, then cursors drag a selection around every element inside, size labels and all, and leave a skeleton block in its place. When the data lands, the real elements swap in one by one: no shimmer, no layout jump.
 
 <a href="media/crosshair-skeleton.mp4">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="media/demo-dark.gif">
-    <img alt="Crosshair Skeleton: corners lock onto a headline, a stats card, a line chart and an article, a grid and wireframe are traced, then the real content fades in" src="media/demo-light.gif" width="800">
+    <img alt="Crosshair Skeleton: corners lock onto a headline, a stats card, a line chart and an article, a grid maps them, cursors select each element and leave skeleton blocks, then the real content cascades in" src="media/demo-light.gif" width="800">
   </picture>
 </a>
 
-▶ **[Watch the full demo](media/crosshair-skeleton.mp4)**: fade, blink and scan reveals, in light and dark (35 s).
+▶ **[Watch the full demo](media/crosshair-skeleton.mp4)**: cascade, flow and fade reveals, in light and dark.
 
-- **Any element:** cards, charts, tables, forms, text, images, lists, video, code. It reads what is inside and traces it.
+- **Any element:** cards, charts, tables, forms, text, images, lists, video, code. It reads what is inside and draws it, text line by text line.
 - **Any framework:** plain JavaScript, React, Next.js, Vue, Svelte, Astro, Angular. One ES module, no dependencies, no CSS file, no fonts, no images.
 - **Light and dark:** every colour comes from the element's own text colour, so it matches your theme with no setup.
 - **Cheap to run:** the long wait runs on the compositor, off-screen skeletons wait to build, and everything is removed after the reveal.
@@ -51,7 +51,7 @@ await skeleton.done();                   // revealed, overlay removed
 Declarative, for any framework or server-rendered HTML:
 
 ```html
-<section data-crosshair="loading" data-crosshair-reveal="blink">…</section>
+<section data-crosshair="loading" data-crosshair-reveal="flow">…</section>
 <script type="module">
   import { watch } from "./crosshair-skeleton.js"; // or "crosshair-skeleton" with a bundler
   watch(); // set data-crosshair to anything else to reveal
@@ -80,25 +80,29 @@ Each adapter is tested against the real framework: the skeleton appears, the rea
 
 | Option | Default | |
 |---|---|---|
-| `reveal` | `"fade"` | `"fade"`, `"blink"` (sections flicker on in order) or `"scan"` (a dithered line wipes down) |
+| `reveal` | `"cascade"` | `"cascade"` (element by element), `"flow"` (strictly top to bottom) or `"fade"` (all at once) |
 | `grace` | `150` | Loads faster than this (ms) never show a skeleton |
 | `minVisible` | `600` | Once shown, it stays at least this long (ms) |
-| `trace` | `"auto"` | `"auto"` traces what is inside, `"box"` the outer box, `"none"` grid and corners only |
+| `trace` | `"auto"` | `"auto"` draws every element inside, `"box"` only the element's own selection, `"none"` grid and corners only |
+| `cursors` | `true` | `true` (1 to 3, by element count), `false`, or a number from 1 to 4 |
+| `labels` | `true` | `W × H` size labels under each selection |
 | `speed` | `1` | `2` is twice as fast |
 
 ## How it knows the shape
 
-It traces whatever is inside the element when loading starts. Render your real component with placeholder data at its final size and you get its exact structure: text lines at their real widths, images as a box with a cross, charts as a box with guides, buttons and inputs as boxes. An empty container falls back to its outer box, grid and corners. `data-crosshair-part="skip | box | chart | media"` overrides any part.
+It draws whatever is inside the element when loading starts. Render your real component with placeholder data at its final size and you get its exact structure: one bar per line of text at its real width, and buttons, chips, images, charts and inputs as blocks in their own shape and corner radius. Table rows, list items and chart bars are drawn as groups, all at once rather than one by one. When the data arrives it measures again, so the swap always lands on the real layout. An empty container falls back to its own selection, grid and corners. `data-crosshair-part="skip | box"` overrides any part.
 
 ## Performance
 
 Measured with `bench.html` at 375, 768 and 1440 px, with every demo skeleton in the viewport (5 to 9) building at once:
 
-| | Build (about 1.5 s) | Waiting |
+| | Build and draw (about 3 s) | Waiting |
 |---|---|---|
-| Chrome 153 | 0 long frames, render work p95 under 5.1 ms | about 0.5 ms per frame |
-| Firefox 158 | 0 to 4 long frames, render work p95 under 10 ms | under 0.1 ms per frame |
-| WebKit 26.6 (Safari) | 2 long frames, render work p95 under 5 ms | about 0.6 ms per frame |
+| Chrome 153 | 0 long frames, render work p95 under 3.5 ms | about 0.4 to 0.6 ms per frame |
+| Firefox 159 | 0 long frames, render work p95 under 9 ms | under 0.1 ms per frame |
+| WebKit 26.6 (Safari) | 1 long frame, render work p95 under 4 ms | about 0.6 to 0.8 ms per frame |
+
+On data-heavy pages (Chrome, 4× CPU throttling): 24 dashboard cards plus a 300-row list build at a steady 60 fps (p95 16.8 ms) with no long tasks, and a skeleton over a 3,000-row list hands over with one 67 ms task, where the first version froze for 3.7 s.
 
 Skeletons that start together cascade in 60 ms apart, `prefers-reduced-motion` gets a static skeleton and a short fade, and nothing is left in the DOM after the reveal.
 
@@ -112,7 +116,7 @@ Then open `demo.html` (21 examples with slow, fast and held loads, all three rev
 
 ## Made by Velox Themes
 
-Crosshair Skeleton is free and open source, made by **[Velox Themes](https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton)**. If you build websites for clients, **[Velox Library](https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton)** has polished sections, components and templates you can copy straight into your project.
+Crosshair Skeleton is free and open source, made by **[Velox Themes](https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton)**. If you build websites for clients, **[Velox Themes](https://library.veloxthemes.com/?utm_source=github&utm_medium=readme&utm_campaign=crosshair-skeleton)** has polished sections, components and templates you can copy straight into your project.
 
 ## License
 

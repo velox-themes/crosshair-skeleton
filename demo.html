@@ -205,14 +205,14 @@
 <body>
 <header>
   <h1>Crosshair Skeleton</h1>
-  <button class="primary" id="slow">Load (2.2 s)</button>
+  <button class="primary" id="slow">Load (3 s)</button>
   <button id="fast">Load (80 ms)</button>
   <button id="hold">Hold</button>
   <button id="now">Data arrives now</button>
   <span class="select"><select id="reveal" aria-label="Reveal style">
+    <option value="cascade">Reveal: cascade</option>
+    <option value="flow">Reveal: flow</option>
     <option value="fade">Reveal: fade</option>
-    <option value="blink">Reveal: blink</option>
-    <option value="scan">Reveal: scan</option>
   </select></span>
   <span class="select"><select id="speed" aria-label="Speed">
     <option value="0.75">Speed 0.75×</option>
@@ -486,7 +486,7 @@ render(card, <span class="k">await</span> data.json());
   }
   function load(ms) { start(); if (ms != null) timer = setTimeout(arrive, ms); }
 
-  document.getElementById("slow").onclick = () => load(2200);
+  document.getElementById("slow").onclick = () => load(3000);
   document.getElementById("fast").onclick = () => load(80);
   document.getElementById("hold").onclick = () => load(null);
   document.getElementById("now").onclick = arrive;
@@ -498,7 +498,7 @@ render(card, <span class="k">await</span> data.json());
   if (matchMedia("(prefers-color-scheme: dark)").matches) document.getElementById("theme").click();
 
   window.demo = { load, arrive, runs: () => runs };
-  if (!new URLSearchParams(location.search).has("bench")) load(2200);
+  if (!new URLSearchParams(location.search).has("bench")) load(3000);
 </script>
 </body>
 </html>

@@ -16,7 +16,7 @@ function apply(el, binding) {
 
 /**
  * <div v-crosshair="loading">…</div>
- * <div v-crosshair="{ loading, reveal: 'blink' }">…</div>
+ * <div v-crosshair="{ loading, reveal: 'flow' }">…</div>
  */
 export const vCrosshair = {
   mounted: apply,

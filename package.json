@@ -1,7 +1,7 @@
 {
   "name": "crosshair-skeleton",
   "version": "1.0.0",
-  "description": "A loading skeleton that locks onto any element, maps a grid over it, traces what is inside, then reveals the real content. No dependencies, any framework, light and dark.",
+  "description": "A loading skeleton that locks onto any element, maps a grid over it, draws a skeleton block for everything inside with design-tool cursors and selections, then swaps the real content in element by element. No dependencies, any framework, light and dark.",
   "type": "module",
   "main": "./crosshair-skeleton.js",
   "module": "./crosshair-skeleton.js",
