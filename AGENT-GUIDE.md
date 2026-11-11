@@ -4,9 +4,22 @@ Read this before integrating the skeleton into a real project. [SKILL.md](./SKIL
 
 **Where the lessons come from (29 October 2026):** a fresh agent with no prior context was given only the skill and a plain request ("replace the Loading… line with a proper loading skeleton, install it with npm"). The page was a copy of a production template-detail page (Next.js 15, React 19, Tailwind 4): gallery, info card with actions, long description, tag lists and three card grids, all filled by one slow API request. The result was then checked in a real browser at 1280 px and 375 px, light and dark, with slow, fast and repeated loads. Every pitfall below happened in that test or was caught by its verification.
 
-## The procedure
+## Landing-page highlight
 
-0. **Check it fits.** Go through [When to use it, and when not](./SKILL.md#when-to-use-it-and-when-not) for each loading state you find. Async content, a wait often over 300 ms, a layout known before the data, an area of about 80 × 40 px or more: all four, or use the alternative that table suggests. Never hide content that is already on screen during a background refresh.
+When the request is to highlight or add an entrance effect on a marketing or landing page, there is no data: use `auto` ([recipe](./SKILL.md#landing-page-highlight)).
+
+1. **List the sections** of the page and, for each, the one supporting element that backs up its message (the hero mockup, a feature image, the bento card to notice). The headline, copy, buttons and navigation are never candidates.
+2. **Choose at most three for the whole page, at most one per section.** Prefer one. Skip a section that is busy (long lists, pricing tables, logo walls, FAQ), and skip one already animated or moving by itself (carousel, marquee, autoplay video).
+3. **Keep the hero's largest element visible.** If the hero's main image or headline is the largest thing on screen, it is what Google measures as the page load; highlight a smaller supporting visual instead, or start below the fold.
+4. **Give each chosen element its final size** before the effect (image `width`/`height` or `aspect-ratio`), so nothing shifts when it draws.
+5. **Wire it declaratively** with `data-crosshair="loading" data-crosshair-auto`, the `cs-js` class and the one CSS line in `<head>`, and one `watch()` per page.
+6. **Verify in a browser:** each highlighted element plays once when scrolled into view and its content shows after the draw and a short pause (about three seconds), at a pace you can follow by eye; scrolling back does not replay; with reduced motion the content shows at once; with JavaScript disabled the content shows; no layout shift and no horizontal scroll at phone width.
+
+When you report back, name each element you highlighted and why, and list the ones you deliberately left out.
+
+## Loading state: the procedure
+
+0. **Check it fits.** Read [When to use it, and when not](./SKILL.md#when-to-use-it-and-when-not) first. For a loading state: async content, a wait often over 300 ms, a layout known before the data, a block big enough to read, and it is the one block on the section that matters. Never one per card or widget, never on content already on screen during a background refresh. For a landing page, follow [Landing-page highlight](#landing-page-highlight) instead.
 1. **Find the loading state.** Search for `Loading`, `isLoading`, `status === "loading"`, `if (!data) return`, spinners and `Suspense` fallbacks. Note which request fills which part of the page.
 2. **Decide the scope: one skeleton per request.** One fetch that fills the whole page gets one skeleton over that page's content, even when it is page-sized. Separate requests (a sidebar widget, a comments list) each get their own. Never wrap the app shell or the navigation.
 3. **Make the real layout render while loading.** Replace the early `return <p>Loading…</p>` with the real component rendered from placeholder data of the same type (see the worked example). This is what the skeleton draws, and it removes layout shift.

@@ -19,12 +19,14 @@ export interface CrosshairOptions {
   pulse?: boolean;
   /** 2 = twice as fast, 0.5 = half speed. Default 1. */
   speed?: number;
+  /** No data to wait for (a landing-page highlight): plays once when the element scrolls into view, then reveals by itself. Skipped under reduced motion. Default false. */
+  auto?: boolean;
 }
 
 export interface CrosshairRun {
   /** The data is in and rendered: reveal (waits for a clean point if mid-build) and clean up. */
   done(): Promise<void>;
-  /** Stop at once and show the content as it is. An element that still has data-crosshair="loading" stays hidden: the declared state wins. */
+  /** Stop at once and show the content as it is. An element that still has data-crosshair="loading" stays hidden: the declared state wins (except with `auto`, which marks it "done" and shows it). */
   cancel(): void;
   /** Resolves once the skeleton is gone, by done() or cancel(). */
   readonly finished: Promise<void>;

@@ -21,10 +21,11 @@ const DEFAULTS = {
   readout: "auto", // phase + size label: true | false | "auto" (only on elements ≥ 240×120)
   pulse: true, // slow breathing while waiting (compositor-only)
   speed: 1, // 2 = twice as fast, 0.5 = half speed
+  auto: false, // true: no data to wait for (a landing-page highlight): plays once when the element scrolls into view, then reveals by itself
 };
 
 // Tuned together as one rhythm. Change `speed`, not these one by one.
-const BUILD = { lock: 90, blink: 105, expand: 570, draw: 390, stagger: 345, drawStart: 480, travel: 58, drag: 101, selHold: 260, fill: 220 };
+const BUILD = { lock: 90, blink: 105, expand: 570, draw: 390, stagger: 345, drawStart: 480, travel: 120, drag: 210, selHold: 300, fill: 260 }; // cursors move at a calm, readable pace
 const HAND = { handoff: 560, item: 123, step: 32, minBlock: 60 };
 const BLINKS = 2;
 const PULSE = 1000;
@@ -33,8 +34,8 @@ const MAX_VISITS = 600;
 const MAX_BLOCKS = 600; // skeleton blocks per skeleton, all elements together
 const GROUP_MIN = 6, GROUP_MAX = 60; // simple sibling shapes drawn as one group (more than 60: one block)
 const MAX_TEXT = 1500; // characters measured per text block: plenty for the 8 lines drawn
-const MAX_DRAW = 2000; // the marquee never takes longer than this, however many elements there are
-const MAX_WAIT = 400;
+const MAX_DRAW = 3200; // the marquee never takes longer than this, however many elements there are
+const AUTO_HOLD = 800; // with auto, how long the finished skeleton stays before the content arrives
 const BLUR_MAX = 24; // more elements than this swapping in on screen: no blur // at the reveal, no element waits longer than this for its own block
 const CURSOR_SCALE = 1.1;
 
@@ -145,17 +146,63 @@ function bezier(x1, y1, x2, y2) {
 const expandCurve = bezier(0.85, 0, 0.15, 1);
 
 // ---------- Shared observers and frame loop ----------
-let io = null;
-const ioCallbacks = new Map();
-function observe(el, cb) {
-  io ||= new IntersectionObserver((entries) => entries.forEach((e) => ioCallbacks.get(e.target)?.(e.isIntersecting)), { rootMargin: "100px" });
-  ioCallbacks.set(el, cb);
-  io.observe(el);
+// Two shared observers. Loading states build 100 px before the element scrolls in, so the skeleton is
+// ready when it arrives; an auto play waits until the element is properly on screen (30% of it, or a
+// strip 30% of the screen tall), so nobody misses the draw. Both always become true eventually.
+const observers = {};
+const ioCallbacks = new Map(); // element → { cb, auto }: the current registration
+const pending = new Map(); // auto targets on screen but not yet past the gate → fail-open timer
+const area = (e) => e.isIntersecting && e.intersectionRect.width > 0 && e.intersectionRect.height > 0; // not just touching an edge
+const onScreen = (e) => area(e) && (e.intersectionRatio >= 0.3 || e.intersectionRect.height >= 0.3 * (e.rootBounds?.height || innerHeight));
+const stopPending = (el) => { clearTimeout(pending.get(el)); pending.delete(el); };
+const inViewport = (el) => {
+  const r = el.getBoundingClientRect(), win = el.ownerDocument.defaultView || window; // the element's own window (iframes)
+  return r.width > 0 && r.height > 0 && r.bottom > 0 && r.right > 0 && r.top < win.innerHeight && r.left < win.innerWidth;
+};
+function seen(entries) {
+  for (const e of entries) {
+    const reg = ioCallbacks.get(e.target);
+    if (!reg?.auto) continue;
+    if (onScreen(e)) { stopPending(e.target); reg.cb(true); }
+    else if (!area(e)) { stopPending(e.target); reg.cb(false); }
+    else if (!pending.has(e.target)) {
+      // Partly on screen but the gate can't be reached (a tall element, a small scroll box, a page that
+      // can't scroll further): play anyway once it has been on screen for a second, so nothing stays hidden
+      reg.cb(false);
+      pending.set(e.target, setTimeout(() => {
+        pending.delete(e.target);
+        if (ioCallbacks.get(e.target) === reg && inViewport(e.target)) reg.cb(true);
+      }, 1000));
+    }
+  }
 }
+function near(entries) {
+  for (const e of entries) {
+    const reg = ioCallbacks.get(e.target);
+    if (reg && !reg.auto) reg.cb(e.isIntersecting);
+  }
+}
+const handlers = { seen, near };
+function observe(el, cb, auto = false) {
+  const k = auto ? "seen" : "near";
+  // 1e-30: any visible pixel crosses it (and it survives Chromium's float32 storage), so an edge touch and a first sliver are different callbacks
+  observers[k] ||= new IntersectionObserver(handlers[k], auto ? { threshold: [0, 1e-30, 0.1, 0.2, 0.3, 0.5, 0.75, 1] } : { rootMargin: "100px" });
+  stopPending(el);
+  ioCallbacks.set(el, { cb, auto });
+  observers[k].observe(el);
+}
+// Stop watching an element. Its updates already queued are dropped (they belong to this run, not to a
+// run that may replace it); queued updates for every other element are still delivered.
 function unobserve(el) {
-  if (!io) return;
-  io.unobserve(el);
+  const held = []; // queued updates for other elements, with the run each belonged to
+  for (const k in observers) {
+    for (const e of observers[k].takeRecords()) if (e.target !== el) held.push([k, e, ioCallbacks.get(e.target)]);
+    observers[k].unobserve(el);
+  }
   ioCallbacks.delete(el);
+  stopPending(el);
+  // Deliver only once this element is fully cleaned up, and only to the run each update belonged to
+  for (const [k, e, reg] of held) if (reg && ioCallbacks.get(e.target) === reg) handlers[k]([e]);
 }
 
 // One animation-frame loop for every skeleton that is drawing; it stops when none is
@@ -602,7 +649,7 @@ export function crosshair(el, options = {}) {
     console.warn("crosshair-skeleton: wrap <" + el.tagName.toLowerCase() + "> in a container and pass the container.");
     return noop();
   }
-  live.get(el)?.cancel();
+  live.get(el)?.supersede();
   injectStyles(el);
 
   const doc = el.ownerDocument;
@@ -611,6 +658,11 @@ export function crosshair(el, options = {}) {
   const k = o.speed > 0 ? 1 / o.speed : 1;
   const t = Object.fromEntries(Object.entries(BUILD).map(([n, v]) => [n, v * k]));
   const reduced = win.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // A purely decorative play is skipped for people who asked for less motion: the content just shows
+  if (o.auto && reduced) {
+    if (el.getAttribute("data-crosshair") === "loading") el.setAttribute("data-crosshair", "done");
+    return noop();
+  }
 
   let state = "wait"; // wait → ready → queued → build → idle → reveal → done
   let visible = false, ov = null, ro = null, shownAt = 0, cleanAt = 0, revealQueued = false;
@@ -661,7 +713,7 @@ export function crosshair(el, options = {}) {
     visible = v;
     if (state === "ready") maybeBuild();
     pulses.forEach((a) => (v ? a.play() : a.pause()));
-  });
+  }, o.auto);
 
   function maybeBuild() {
     // Off-screen skeletons are not built until they scroll into view
@@ -732,7 +784,11 @@ export function crosshair(el, options = {}) {
     W = el.clientWidth; // the overlay covers the padding box
     H = el.clientHeight;
     [BW, BH] = outerSize(el); // the readout reports the element's outer size, as DevTools does
-    if (W < 24 || H < 12) { state = "idle"; return; } // too small to draw; content just waits hidden
+    if (W < 24 || H < 12) { // too small to draw; content just waits hidden (or, with auto, shows at once)
+      state = "idle";
+      if (o.auto) run.done();
+      return;
+    }
     leaves = measure(el, W, H, o);
     if (win.getComputedStyle(el).position === "static") {
       prevPos = { value: el.style.getPropertyValue("position"), priority: el.style.getPropertyPriority("position") };
@@ -836,6 +892,8 @@ export function crosshair(el, options = {}) {
     // document clock so every skeleton on the page breathes together.
     later(() => {
       if (state === "build") state = "idle";
+      // Nothing to wait for: rest on the finished skeleton for a moment, then hand over
+      if (o.auto) return later(() => run.done(), AUTO_HOLD * k);
       if (!o.pulse) return;
       const a = gridSvg.animate([{ opacity: 1 }, { opacity: 0.4 }], { duration: PULSE, iterations: Infinity, direction: "alternate", easing: "ease-in-out" });
       a.startTime = Math.ceil(doc.timeline.currentTime / (2 * PULSE)) * 2 * PULSE;
@@ -954,6 +1012,8 @@ export function crosshair(el, options = {}) {
     if (state === "reveal" || state === "done") return;
     const wasIdle = state === "idle";
     state = "reveal";
+    // A declared "loading" keeps content hidden until the app changes it; an auto run has no app to wait for
+    if (o.auto) el.setAttribute("data-cs-show", "");
     timers.forEach(clearTimeout);
     timers.clear();
     if (!ov) return finish();
@@ -1036,7 +1096,7 @@ export function crosshair(el, options = {}) {
     const order = style === "flow" ? [...leaves].sort((a, b) => (Math.abs(a.y - b.y) < 4 ? a.x - b.x : a.y - b.y)) : leaves;
     if (style !== "fade" && order.length) {
       // The shell (cards, wrappers) fades in, then elements swap in place of their blocks in reading order;
-      // none swaps before its own block has been drawn and shown, but never waits more than MAX_WAIT
+      // none swaps before its own block has been drawn and shown (the draw itself is capped by MAX_DRAW)
       const inLeaves = new Set(order.map((lf) => lf.el));
       const item = HAND.item * k, step = HAND.step * k, start0 = D * 0.2;
       let shellAt = 0; // when the element itself is the group (a list of rows), its rows wait for their blocks
@@ -1047,7 +1107,7 @@ export function crosshair(el, options = {}) {
       order.forEach((lf) => {
         const seen = onScreen(lf);
         const e = entryOf.get(lf);
-        const ready = e && seen ? clamp(e.settleAt + t.fill + HAND.minBlock * k - now, 0, MAX_WAIT * k) : 0;
+        const ready = e && seen ? Math.max(0, e.settleAt + t.fill + HAND.minBlock * k - now) : 0;
         const at = seen ? Math.max(start0 + i++ * step, ready, style === "flow" ? prev + step : 0) : start0;
         if (seen) prev = at;
         if (lf.el === el) { fadeText(item, at); shellAt = at; }
@@ -1074,7 +1134,7 @@ export function crosshair(el, options = {}) {
     later(finish, end + 50);
   }
 
-  function finish() {
+  function finish(superseded = false) {
     if (state === "done") return;
     state = "done";
     timers.forEach(clearTimeout);
@@ -1086,6 +1146,11 @@ export function crosshair(el, options = {}) {
     if (live.get(el) === run) live.delete(el);
     active.delete(run);
     restoreHost();
+    if (o.auto && !superseded) {
+      // Nothing to wait for, so the element is done: a declared "loading" must not hide it again
+      if (el.getAttribute("data-crosshair") === "loading") el.setAttribute("data-crosshair", "done");
+      el.removeAttribute("data-cs-show");
+    }
     tracked.forEach((a) => a.cancel());
     tracked = [];
     pulses = [];
@@ -1111,6 +1176,8 @@ export function crosshair(el, options = {}) {
     /** Stop at once and show the content as it is, no animation. (An element that still has
      *  data-crosshair="loading" stays hidden: the declared state wins until it changes.) */
     cancel() { finish(); },
+    /** @internal a new run on the same element replaces this one: no "done" mark for an auto run */
+    supersede() { finish(true); },
     /** @internal true once done() or cancel() has been called */
     get ending() { return revealQueued || state === "done"; },
   };
@@ -1123,7 +1190,7 @@ export function crosshair(el, options = {}) {
 /**
  * Declarative use: any element with data-crosshair="loading" gets a skeleton;
  * changing the attribute to anything else (or removing it) reveals the content.
- * Options: data-crosshair-reveal, data-crosshair-trace, data-crosshair-speed, data-crosshair-cursors.
+ * Options: data-crosshair-reveal, data-crosshair-trace, data-crosshair-speed, data-crosshair-cursors, data-crosshair-auto.
  * Pass a shadow root to watch inside a web component.
  * @returns {() => void} stop watching (and stop the skeletons this watcher started)
  */
@@ -1141,6 +1208,7 @@ export function watch(root = NS_READY ? document : null) {
         ...(d.crosshairReveal && { reveal: d.crosshairReveal }),
         ...(d.crosshairTrace && { trace: d.crosshairTrace }),
         ...(d.crosshairSpeed && { speed: +d.crosshairSpeed }),
+        ...("crosshairAuto" in d && d.crosshairAuto !== "false" && { auto: true }), // a bare attribute counts
         ...(d.crosshairCursors && { cursors: d.crosshairCursors === "false" ? false : +d.crosshairCursors || true }),
       });
       mine.add(run);

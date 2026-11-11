@@ -36,12 +36,13 @@
   </picture>
 </p>
 
-Crosshair Skeleton is a skeleton loader (a skeleton screen) for anything that waits on data. Crosshair corners lock onto the element, a grid maps it, and cursors select every element inside, size labels and all, leaving a skeleton block in its exact shape. When the data lands, the real content swaps in element by element: no shimmer, no layout jump. This repository is the whole thing: one dependency-free ES module, adapters for React and Next.js, Vue and Svelte, and an agent skill for Claude Code and Codex.
+Crosshair Skeleton is a skeleton loader (a skeleton screen) and an attention effect: use it to highlight one supporting element on a landing page, or as the loading state of a block that waits on data. Crosshair corners lock onto the element, a grid maps it, and cursors select every element inside, size labels and all, leaving a skeleton block in its exact shape. When the data lands, the real content swaps in element by element: no shimmer, no layout jump. This repository is the whole thing: one dependency-free ES module, adapters for React and Next.js, Vue and Svelte, and an agent skill for Claude Code and Codex.
 
 <br>
 
 ## Features
 
+- **A landing-page highlight.** With `auto`, it plays once when a hero visual, an image or a bento card scrolls into view, then shows the content after a short pause. No data needed.
 - **Draws your real layout.** It reads what is inside the element: one bar per line of text at its real width, and buttons, chips, images, charts and inputs as blocks in their own shape and corner radius. When the data arrives it measures again, so the swap always lands on the real layout.
 - **Tables, lists and charts in one go.** Table rows, list items, cards of one kind and chart bars are drawn as groups, all at once rather than one by one.
 - **Any element, any framework.** Cards, charts, tables, forms, text, images, lists, video and code, in plain JavaScript, React, Next.js, Vue, Nuxt, Svelte, SvelteKit, Solid, Angular, Lit, Astro, Alpine or htmx. No CSS file, fonts or images to add.
@@ -53,6 +54,20 @@ Crosshair Skeleton is a skeleton loader (a skeleton screen) for anything that wa
 | Drawing: cursors select each element | Waiting, in dark mode |
 | --- | --- |
 | ![Cursors selecting the footer labels of a stats card and an article card, with size labels under each selection, while a headline, a bar chart and a line chart are already drawn as skeleton blocks](media/drawing.jpg) | ![The same headline, stats card, line chart and article as dark skeleton blocks on a faint grid, with crosshair corners and AWAIT size readouts](media/waiting-dark.jpg) |
+
+<br>
+
+## When to use it
+
+It is a cosmetic effect that draws the eye, so restraint is the point:
+
+- **Highlight one supporting element per section:** the hero visual, an image container, the bento card you want noticed. Not the headline, copy, buttons or navigation.
+- **At most one per section and three per page.** Most pages need one.
+- **Skip busy sections** (long lists, pricing tables, logo walls): when a block looks crowded, the effect only adds noise.
+- **Keep the hero's largest element visible,** so the page load Google measures is not delayed.
+- **In an app,** use it as the loading state of one slow block of data, not on every card or widget.
+
+The full rules, with what to use instead, are in [SKILL.md](./SKILL.md#when-to-use-it-and-when-not).
 
 <br>
 
@@ -130,6 +145,7 @@ Each adapter is tested against the real framework: the skeleton appears, the rea
 | `cursors` | `true` | `true` (1 to 3, by element count), `false`, or a number from 1 to 4 |
 | `labels` | `true` | `W × H` size labels under each selection |
 | `speed` | `1` | `2` is twice as fast |
+| `auto` | `false` | `true` for a landing-page highlight: plays once when the element scrolls into view, then shows the content by itself |
 
 <br>
 
