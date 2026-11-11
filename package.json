@@ -1,6 +1,6 @@
 {
   "name": "crosshair-skeleton",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Animated skeleton loader for React, Next.js, Vue, Svelte and plain JS. Draws a loading skeleton in your real layout. Light and dark, no dependencies.",
   "type": "module",
   "main": "./crosshair-skeleton.js",
